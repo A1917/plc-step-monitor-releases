@@ -72,6 +72,8 @@ namespace Test
                     BorderStyle = BorderStyle.FixedSingle,
                     Text = "工位" + i + ":\n0"
                 };
+                int idx = i;   // 闭包捕获
+                labels[i].DoubleClick += (s, e) => OpenTrend(idx);
                 tblayout_Step.Controls.Add(labels[i], i % GridColumns, i / GridColumns);
             }
             tblayout_Step.ResumeLayout();
@@ -90,6 +92,7 @@ namespace Test
                         if (result.IsSuccess)
                         {
                             PlcData.ThdStep = result.Content;
+                            EventStore.Feed(result.Content);   // 步号变化事件入缓冲（趋势图数据源）
                             UpdateLabels();
                         }
                     }
@@ -135,6 +138,17 @@ namespace Test
             }
             catch (ObjectDisposedException) { }
             catch (InvalidOperationException) { }
+        }
+
+        /// <summary>双击工位格子：打开该工位实时趋势图（非模态 MDI 子窗体）</summary>
+        private void OpenTrend(int station)
+        {
+            var frm = new Frm_Records(station);
+            if (this.MdiParent != null)
+            {
+                frm.MdiParent = this.MdiParent;
+            }
+            frm.Show();
         }
 
         private void Frm_StepInfo_Load(object sender, EventArgs e)
