@@ -14,6 +14,7 @@ namespace Test
         private Label lblPage;
         private CheckBox chkCursor;
         private CheckBox chkRange;
+        private CheckBox chkLockRange;
         private Label lblCursorInfo;
         private Label lblPageSec;
         private NumericUpDown nudPageSec;
@@ -37,6 +38,7 @@ namespace Test
             this.lblPage = new System.Windows.Forms.Label();
             this.chkCursor = new System.Windows.Forms.CheckBox();
             this.chkRange = new System.Windows.Forms.CheckBox();
+            this.chkLockRange = new System.Windows.Forms.CheckBox();
             this.lblCursorInfo = new System.Windows.Forms.Label();
             this.lblPageSec = new System.Windows.Forms.Label();
             this.nudPageSec = new System.Windows.Forms.NumericUpDown();
@@ -61,6 +63,7 @@ namespace Test
             this.panelBottom.Controls.Add(this.nudPageSec);
             this.panelBottom.Controls.Add(this.lblPageSec);
             this.panelBottom.Controls.Add(this.lblCursorInfo);
+            this.panelBottom.Controls.Add(this.chkLockRange);
             this.panelBottom.Controls.Add(this.chkRange);
             this.panelBottom.Controls.Add(this.chkCursor);
             this.panelBottom.Controls.Add(this.lblPage);
@@ -103,6 +106,13 @@ namespace Test
             this.chkRange.TabIndex = 4;
             this.chkRange.Text = "区域";
             this.chkRange.UseVisualStyleBackColor = true;
+            this.chkLockRange.AutoSize = true;
+            this.chkLockRange.Location = new System.Drawing.Point(432, 11);
+            this.chkLockRange.Name = "chkLockRange";
+            this.chkLockRange.Size = new System.Drawing.Size(60, 19);
+            this.chkLockRange.TabIndex = 5;
+            this.chkLockRange.Text = "锁定";
+            this.chkLockRange.UseVisualStyleBackColor = true;
             this.lblCursorInfo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.lblCursorInfo.Location = new System.Drawing.Point(12, 36);
             this.lblCursorInfo.Name = "lblCursorInfo";

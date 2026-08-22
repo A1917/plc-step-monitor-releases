@@ -29,6 +29,7 @@ namespace Test
         private double _panViewStart;
         private double _panYViewStart;
         private double _panYSizeStart;
+        private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
 
         private const int RefreshIntervalMs = 500;
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
@@ -79,7 +80,12 @@ namespace Test
             chart1.DoubleClick += (s, e) => FitWindow();
             chart1.MouseDown += OnChartMouseDown;
             chart1.MouseMove += OnChartMouseMove;
-            chart1.MouseUp += (s, e) => _isPanning = false;
+            chart1.MouseUp += (s, e) =>
+            {
+                _isPanning = false;
+                _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
+                _lastRangeEnd = _curEnd.X;
+            };
             chart1.Paint += OnChartPaint;   // 自绘游标步号标签
 
             InitAnnotations();
@@ -92,7 +98,7 @@ namespace Test
                 chart1.Invalidate();
                 if (chkCursor.Checked)
                 {
-                    PlaceCursorsInView();
+                    PlaceCursorInView();   // 只重置游标，不影响区域
                 }
             };
             chkRange.CheckedChanged += (s, e) =>
@@ -100,7 +106,7 @@ namespace Test
                 _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked;
                 if (chkRange.Checked)
                 {
-                    PlaceCursorsInView();
+                    PlaceRangeInView();   // 只重置区域，不影响游标
                 }
             };
             nudPageSec.ValueChanged += (s, e) =>
@@ -155,7 +161,8 @@ namespace Test
             {
                 AxisX = area.AxisX, AxisY = area.AxisY,
                 AllowMoving = false, AllowResizing = false, LineWidth = 0,
-                BackColor = Color.FromArgb(50, 100, 180, 255), Visible = false
+                BackColor = Color.FromArgb(70, 25, 25, 112),   // 透明深蓝标注
+                Visible = false
             };
 
             chart1.Annotations.Add(_cursor);
@@ -194,22 +201,33 @@ namespace Test
                 area.AxisY.ScaleView.Position = 0;
                 area.AxisY.ScaleView.Size = 10;
             }
-            PlaceCursorsInView();
+            PlaceCursorInView();
+            PlaceRangeInView();
             UpdatePageLabel();
             _followTail = true;
         }
 
-        /// <summary>把游标放置在当前视野中间（区域线在中心两侧留间隔）</summary>
-        private void PlaceCursorsInView()
+        /// <summary>单游标置于视野中间（不碰区域线）</summary>
+        private void PlaceCursorInView()
+        {
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            _cursor.X = view.Position + view.Size / 2;
+            UpdateCursorInfo();
+            chart1.Invalidate();
+        }
+
+        /// <summary>区域线置于视野中间两侧（不碰单游标）</summary>
+        private void PlaceRangeInView()
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             double center = view.Position + view.Size / 2;
-            _cursor.X = center;
             _curStart.X = center - view.Size * 0.15;
             _curEnd.X = center + view.Size * 0.15;
+            _lastRangeStart = _curStart.X;
+            _lastRangeEnd = _curEnd.X;
             SyncRangeRect();
-            UpdateCursorInfo();
             UpdateRangeInfo();
+            chart1.Invalidate();
         }
 
         /// <summary>适应当前页：X 轴回到每页时长（右端不动），Y 轴适应当前窗口内数据的最小~最大步号</summary>
@@ -328,7 +346,8 @@ namespace Test
             var viewX = area.AxisX.ScaleView;
             double xSize = viewX.Size;
             viewX.Position = mouseX - (mouseX - viewX.Position) * factor;
-            viewX.Size = Math.Max(xSize * factor, 0.5 / 86400000.0);
+            // X 窗口宽度上限 = 每页时长（缩小不能超过设定时间）
+            viewX.Size = Math.Min(Math.Max(xSize * factor, 0.5 / 86400000.0), PageSizeDays);
 
             var viewY = area.AxisY.ScaleView;
             double ySize = double.IsNaN(viewY.Size) ? (area.AxisY.Maximum - area.AxisY.Minimum) : viewY.Size;
@@ -384,7 +403,7 @@ namespace Test
                 : area.AxisY.ScaleView.Position;
         }
 
-        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（X=内容跟随，Y=视野跟随）</summary>
+        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（X=内容跟随，Y=视野跟随）；锁定区域联动</summary>
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             if (_isPanning)
@@ -398,6 +417,26 @@ namespace Test
                 _followTail = false;
                 SyncRangeRect();
                 UpdatePageLabel();
+                return;
+            }
+            // 锁定区域：拖动一根线时另一根同步（保持区域长度，整体平移）
+            if (chkLockRange.Checked && chkRange.Checked)
+            {
+                double dStart = _curStart.X - _lastRangeStart;
+                double dEnd = _curEnd.X - _lastRangeEnd;
+                if (Math.Abs(dStart) > 1e-12 && Math.Abs(dEnd) < Math.Abs(dStart) * 0.1)
+                {
+                    _curEnd.X += dStart;            // start 移动 → end 跟随
+                }
+                else if (Math.Abs(dEnd) > 1e-12 && Math.Abs(dStart) < Math.Abs(dEnd) * 0.1)
+                {
+                    _curStart.X += dEnd;            // end 移动 → start 跟随
+                }
+                _lastRangeStart = _curStart.X;
+                _lastRangeEnd = _curEnd.X;
+                SyncRangeRect();
+                UpdateRangeInfo();
+                chart1.Invalidate();
             }
         }
 
@@ -460,6 +499,30 @@ namespace Test
                 {
                     DrawStepTag(e.Graphics, area, _curEnd.X, Color.DeepSkyBlue);
                 }
+                DrawRangeDuration(e.Graphics, area);   // 区域时长画在图表内
+            }
+        }
+
+        /// <summary>区域时长文本画在区域中间（顶部标签行下方）</summary>
+        private void DrawRangeDuration(Graphics g, ChartArea area)
+        {
+            double x1 = Math.Min(_curStart.X, _curEnd.X);
+            double x2 = Math.Max(_curStart.X, _curEnd.X);
+            double midX = (x1 + x2) / 2;
+            double durMs = (x2 - x1) * 86400000.0;
+            string text = durMs.ToString("F3") + " s";
+            double xPix = area.AxisX.ValueToPixelPosition(midX);
+            double topPix = area.Position.Y / 100 * chart1.Height + 24;   // 标签行下方
+
+            using (var bg = new SolidBrush(Color.FromArgb(180, 25, 25, 112)))
+            {
+                SizeF sz = g.MeasureString(text, _labelFont);
+                float left = (float)xPix - sz.Width / 2 - 4;
+                double plotLeft = area.Position.X / 100 * chart1.Width;
+                if (left < plotLeft) left = (float)plotLeft;
+                var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
+                g.FillRectangle(bg, rect);
+                g.DrawString(text, _labelFont, Brushes.White, rect.X + 4, rect.Y + 2);
             }
         }
 
