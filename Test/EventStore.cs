@@ -93,11 +93,13 @@ namespace Test
                 q = new Queue<StepEvent>();
                 _buffers[station] = q;
             }
-            q.Enqueue(new StepEvent(DateTime.Now, station, step));
+            var ev = new StepEvent(DateTime.Now, station, step);
+            q.Enqueue(ev);
             while (q.Count > BufferCapacity)
             {
                 q.Dequeue();   // 环形：超出容量丢弃最老
             }
+            RecordStore.Write(station, ev.Time, step);   // 记录开关 ON 时落盘
         }
 
         /// <summary>

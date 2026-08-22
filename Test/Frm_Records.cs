@@ -31,6 +31,7 @@ namespace Test
         private double _panYSizeStart;
         private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
         private Point _mousePos = new Point(-1, -1);     // 鼠标在图表上的位置（-1 = 不在图表）
+        private bool _loadingFromFile;                    // 历史加载模式（暂停实时追加）
 
         private const int RefreshIntervalMs = 500;
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
@@ -98,6 +99,7 @@ namespace Test
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(+1);
             btnFit.Click += (s, e) => FitToData();
+            btnLoad.Click += (s, e) => LoadHistory();
             chkCursor.CheckedChanged += (s, e) =>
             {
                 _cursor.Visible = chkCursor.Checked;
@@ -196,6 +198,19 @@ namespace Test
         private void FitWindow()
         {
             var area = chart1.ChartAreas[0];
+            if (_loadingFromFile)
+            {
+                // 历史模式：双击退出，恢复实时内存数据
+                _loadingFromFile = false;
+                _events.Clear();
+                _events.AddRange(EventStore.GetAll(_station));
+                if (_events.Count > 0)
+                {
+                    _lastPointTime = _events[_events.Count - 1].Time;
+                }
+                RebuildPoints();
+                Text = "工位 " + _station + " 实时趋势";
+            }
             DateTime end = _events.Count > 0 ? _events[_events.Count - 1].Time : DateTime.Now;
             DateTime start = end.AddMilliseconds(-PageSizeMs);
             var view = area.AxisX.ScaleView;
@@ -294,9 +309,61 @@ namespace Test
             UpdatePageLabel();
         }
 
-        /// <summary>增量拉取 + 跟随模式下窗口贴最新</summary>
+        /// <summary>加载历史记录文件（records/events_日期.csv），进入历史查看模式</summary>
+        private void LoadHistory()
+        {
+            using (var dlg = new OpenFileDialog())
+            {
+                dlg.Title = "加载历史记录";
+                dlg.Filter = "CSV 记录 (*.csv)|*.csv";
+                dlg.InitialDirectory = RecordStore.RecordsDir;
+                if (dlg.ShowDialog() != DialogResult.OK)
+                {
+                    return;
+                }
+                var fileEvents = RecordStore.Load(dlg.FileName).FindAll(ev => ev.Station == _station);
+                if (fileEvents.Count == 0)
+                {
+                    MessageBox.Show("文件中无该工位的有效数据");
+                    return;
+                }
+                fileEvents.Sort((a, b) => a.Time.CompareTo(b.Time));
+                _loadingFromFile = true;
+                _events.Clear();
+                _events.AddRange(fileEvents);
+                _lastPointTime = _events[_events.Count - 1].Time;
+
+                RebuildPoints();
+                // 适应显示文件全部数据
+                var area = chart1.ChartAreas[0];
+                double start = _events[0].Time.ToOADate();
+                double end = _events[_events.Count - 1].Time.ToOADate();
+                area.AxisX.ScaleView.Position = start;
+                area.AxisX.ScaleView.Size = Math.Max(end - start, 0.5 / 86400000.0);
+                short minY = short.MaxValue, maxY = short.MinValue;
+                foreach (var ev in _events)
+                {
+                    if (ev.Step < minY) minY = ev.Step;
+                    if (ev.Step > maxY) maxY = ev.Step;
+                }
+                double ySpan = Math.Max(maxY - minY, 1);
+                area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                _followTail = false;
+                UpdatePageLabel();
+                SyncRangeRect();
+                chart1.Invalidate();
+                Text = "工位 " + _station + " 历史记录（双击图表回实时）";
+            }
+        }
+
+        /// <summary>增量拉取 + 跟随模式下窗口贴最新（历史加载模式暂停增量）</summary>
         private void RefreshChart()
         {
+            if (_loadingFromFile)
+            {
+                return;   // 历史模式：不追加实时数据
+            }
             var fresh = EventStore.GetSince(_station, _lastPointTime);
             if (fresh.Count == 0) return;
             _lastPointTime = fresh[fresh.Count - 1].Time;
@@ -672,7 +739,7 @@ namespace Test
         {
             TimeSpan d = (t2 - t1).Duration();
             return t1.ToString("HH:mm:ss.fff") + " ~ " + t2.ToString("HH:mm:ss.fff")
-                   + "  时长 " + d.TotalMilliseconds.ToString("F0") + " ms";
+                   + "  时长 " + d.TotalSeconds.ToString("F3") + " s";
         }
 
         /// <summary>二分查找：t 时刻所处的步号</summary>

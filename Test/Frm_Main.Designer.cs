@@ -17,6 +17,7 @@ namespace Test
         private Label lblPlcIp;
         private TextBox txtPlcIp;
         private CheckBox chkSimulate;
+        private CheckBox chkRecord;
 
         protected override void Dispose(bool disposing)
         {
@@ -41,6 +42,7 @@ namespace Test
             this.lblPlcIp = new System.Windows.Forms.Label();
             this.txtPlcIp = new System.Windows.Forms.TextBox();
             this.chkSimulate = new System.Windows.Forms.CheckBox();
+            this.chkRecord = new System.Windows.Forms.CheckBox();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -69,6 +71,7 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.chkRecord);
             this.panel1.Controls.Add(this.chkSimulate);
             this.panel1.Controls.Add(this.txtPlcIp);
             this.panel1.Controls.Add(this.lblPlcIp);
@@ -122,6 +125,14 @@ namespace Test
             this.chkSimulate.Text = "模拟数据";
             this.chkSimulate.UseVisualStyleBackColor = true;
             this.chkSimulate.CheckedChanged += new System.EventHandler(chkSimulate_CheckedChanged);
+            this.chkRecord.AutoSize = true;
+            this.chkRecord.Location = new System.Drawing.Point(320, 23);
+            this.chkRecord.Name = "chkRecord";
+            this.chkRecord.Size = new System.Drawing.Size(60, 19);
+            this.chkRecord.TabIndex = 11;
+            this.chkRecord.Text = "记录";
+            this.chkRecord.UseVisualStyleBackColor = true;
+            this.chkRecord.CheckedChanged += new System.EventHandler(chkRecord_CheckedChanged);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);

@@ -19,6 +19,7 @@ namespace Test
         private Label lblPageSec;
         private NumericUpDown nudPageSec;
         private Button btnFit;
+        private Button btnLoad;
 
         protected override void Dispose(bool disposing)
         {
@@ -43,6 +44,7 @@ namespace Test
             this.lblPageSec = new System.Windows.Forms.Label();
             this.nudPageSec = new System.Windows.Forms.NumericUpDown();
             this.btnFit = new System.Windows.Forms.Button();
+            this.btnLoad = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
@@ -59,6 +61,7 @@ namespace Test
             this.chart1.Size = new System.Drawing.Size(800, 450);
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
+            this.panelBottom.Controls.Add(this.btnLoad);
             this.panelBottom.Controls.Add(this.btnFit);
             this.panelBottom.Controls.Add(this.nudPageSec);
             this.panelBottom.Controls.Add(this.lblPageSec);
@@ -138,6 +141,12 @@ namespace Test
             this.btnFit.TabIndex = 8;
             this.btnFit.Text = "适应";
             this.btnFit.UseVisualStyleBackColor = true;
+            this.btnLoad.Location = new System.Drawing.Point(620, 7);
+            this.btnLoad.Name = "btnLoad";
+            this.btnLoad.Size = new System.Drawing.Size(60, 25);
+            this.btnLoad.TabIndex = 9;
+            this.btnLoad.Text = "加载";
+            this.btnLoad.UseVisualStyleBackColor = true;
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 485);

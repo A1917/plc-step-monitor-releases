@@ -199,6 +199,12 @@ namespace Test
             }
         }
 
+        /// <summary>记录开关：ON 时步号变化事件落盘到 records/events_日期.csv</summary>
+        private void chkRecord_CheckedChanged(object sender, System.EventArgs e)
+        {
+            RecordStore.Enabled = chkRecord.Checked;
+        }
+
         private void Form1_Load(object sender, System.EventArgs e)
         {
             FormClosing += Form1_FormClosing;
