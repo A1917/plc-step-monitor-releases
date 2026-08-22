@@ -104,7 +104,9 @@ namespace Test
             nudPageSec.ValueChanged += (s, e) =>
             {
                 var view = area.AxisX.ScaleView;
+                double right = view.Position + view.Size;   // 保持窗口右端不动，仅改宽度
                 view.Size = PageSizeDays;
+                view.Position = right - PageSizeDays;
                 _followTail = false;
                 SyncRangeRect();
                 UpdatePageLabel();
@@ -154,9 +156,17 @@ namespace Test
             };
             _cursorLabel = new TextAnnotation
             {
-                AxisX = area.AxisX, ClipToChartArea = area.Name,
-                IsMultiline = false, BackColor = Color.Orange,
-                ForeColor = Color.White, Font = new Font("微软雅黑", 9f), Visible = false
+                AxisX = area.AxisX,
+                AxisY = area.AxisY,                       // 必须显式绑定双轴，否则不显示
+                ClipToChartArea = area.Name,
+                Width = 90,                               // 像素尺寸（默认 0 宽不可见）
+                Height = 20,
+                IsMultiline = false,
+                BackColor = Color.Orange,
+                ForeColor = Color.White,
+                Font = new Font("微软雅黑", 9f),
+                AnchorAlignment = ContentAlignment.TopCenter,   // 锚点上方居中
+                Visible = false
             };
 
             chart1.Annotations.Add(_cursor);
@@ -334,15 +344,15 @@ namespace Test
                 : area.AxisY.ScaleView.Position;
         }
 
-        /// <summary>鼠标移动：拖拽平移 X/Y 双轴</summary>
+        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（视野跟随鼠标方向）</summary>
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
-                double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
+                double dx = (e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
                 area.AxisX.ScaleView.Position = _panViewStart + dx;
-                double dy = -(e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
+                double dy = (e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
                 area.AxisY.ScaleView.Position = _panYViewStart + dy;
                 area.AxisY.ScaleView.Size = _panYSizeStart;
                 _followTail = false;
@@ -370,7 +380,8 @@ namespace Test
             short step = FindStepAt(t);
             // 步号标签跟随游标线
             _cursorLabel.AnchorX = _cursor.X;
-            _cursorLabel.AnchorY = area.AxisY.Maximum;
+            double topY = double.IsNaN(area.AxisY.Maximum) ? 100 : area.AxisY.Maximum;
+            _cursorLabel.AnchorY = topY;
             _cursorLabel.Text = "步号 " + step;
             string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + step;
             if (chkRange.Checked)
