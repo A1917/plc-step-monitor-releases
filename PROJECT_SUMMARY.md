@@ -65,7 +65,7 @@
    - 设计：按工位独立 CycleDetector（可替换边界判定接口：指纹法默认→前缀聚类升级）；StepRecorder 挂轮询线程喂数据；CSV UTF-8 BOM 按天分文件（明细 steps_/汇总 cycles_）；Frm_Records 用内置 Chart 控件（无需 NuGet）**实时滚动+周期分色** + DataGridView TopN（默认10）
    - 交互（2026-08-22 确认）：工位格子**保持 Label + 双击**打开该工位实时趋势图（非模态 Show，不阻塞监控），视觉零回归；触摸屏场景将来可切无边框 Button 单击（代码预留切换开关）
    - 存储（2026-08-22 确认，采集/持久化解耦）：**只存步号变化事件**（非全量采样，量降 10~100 倍）；三级通路=内存环形缓冲(实时直读)→临时分段文件(10min/段滚动保留~2h)→正式记录(主界面开关ON按天CSV落盘)；统一格式统一加载，启动清理过期临时段；加载支持选日期/时间段回放，表格TopN基于加载数据重算
-   - 实施顺序：CycleDetector(纯逻辑可测)→EventStore(事件模型+环形缓冲+分段文件)→StepRecorder+RecordStore→Frm_Records(实时趋势+表格+加载回放)→工位 Label 双击接入→主界面记录开关→仿真联调→现场实测
+   - 实施顺序（✅ 2026-08-22 已完成第 1 步）：EventStore(✅)+Frm_Records 实时趋势图(✅)+工位双击(✅) 已交付 v0.3-trend → 下一步：CycleDetector(周期判定指纹法)→临时分段文件+记录开关落盘→表格TopN+加载回放→仿真联调→现场实测
 
 ## 五、版本管理（本次重建）
 - 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程分支 `v2-optimized`（A1917/plc-step-monitor）
