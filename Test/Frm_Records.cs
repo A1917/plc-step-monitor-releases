@@ -58,8 +58,14 @@ namespace Test
             area.CursorX.IsUserSelectionEnabled = true;
             area.CursorY.IsUserEnabled = true;
             area.CursorY.IsUserSelectionEnabled = true;
+            // 十字光标（跟随鼠标，对标工业趋势控件 HslCurve 的交互）
+            area.CursorX.LineColor = Color.FromArgb(160, 255, 0, 0);
+            area.CursorY.LineColor = Color.FromArgb(160, 255, 0, 0);
             area.AxisX.ScaleView.Zoomable = true;
             area.AxisY.ScaleView.Zoomable = true;
+            // 数据点提示：悬停显示 时间(ms) + 步号
+            _series.ToolTip = "#VALX{yyyy-MM-dd HH:mm:ss.fff}\n步号 #VALY";
+            chart1.MouseMove += OnChartMouseMove;
 
             chart1.MouseWheel += OnMouseWheel;
             chart1.AxisViewChanged += OnAxisViewChanged;
@@ -147,6 +153,32 @@ namespace Test
             {
                 // 程序主动更新视图（跟随模式）也会触发此事件，忽略
                 return;
+            }
+        }
+
+        /// <summary>鼠标移动：底部信息栏实时显示光标对应的时间(ms)与步号</summary>
+        private void OnChartMouseMove(object sender, MouseEventArgs e)
+        {
+            if (lblCursorInfo == null)
+            {
+                return;
+            }
+            var area = chart1.ChartAreas[0];
+            try
+            {
+                double xVal = area.AxisX.PixelPositionToValue(e.X);
+                double yVal = area.AxisY.PixelPositionToValue(e.Y);
+                if (double.IsNaN(xVal) || double.IsNaN(yVal))
+                {
+                    lblCursorInfo.Text = string.Empty;
+                    return;
+                }
+                DateTime t = DateTime.FromOADate(xVal);
+                lblCursorInfo.Text = "时间: " + t.ToString("HH:mm:ss.fff") + "    步号: " + (short)Math.Round(yVal);
+            }
+            catch
+            {
+                lblCursorInfo.Text = string.Empty;
             }
         }
     }
