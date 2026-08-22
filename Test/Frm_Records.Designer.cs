@@ -15,6 +15,9 @@ namespace Test
         private CheckBox chkCursor;
         private CheckBox chkRange;
         private Label lblCursorInfo;
+        private Label lblPageMin;
+        private NumericUpDown nudPageMin;
+        private Button btnFit;
 
         protected override void Dispose(bool disposing)
         {
@@ -35,8 +38,12 @@ namespace Test
             this.chkCursor = new System.Windows.Forms.CheckBox();
             this.chkRange = new System.Windows.Forms.CheckBox();
             this.lblCursorInfo = new System.Windows.Forms.Label();
+            this.lblPageMin = new System.Windows.Forms.Label();
+            this.nudPageMin = new System.Windows.Forms.NumericUpDown();
+            this.btnFit = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudPageMin)).BeginInit();
             base.SuspendLayout();
             ChartArea chartArea1 = new ChartArea();
             chartArea1.Name = "ChartArea1";
@@ -50,6 +57,9 @@ namespace Test
             this.chart1.Size = new System.Drawing.Size(800, 450);
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
+            this.panelBottom.Controls.Add(this.btnFit);
+            this.panelBottom.Controls.Add(this.nudPageMin);
+            this.panelBottom.Controls.Add(this.lblPageMin);
             this.panelBottom.Controls.Add(this.lblCursorInfo);
             this.panelBottom.Controls.Add(this.chkRange);
             this.panelBottom.Controls.Add(this.chkCursor);
@@ -99,6 +109,25 @@ namespace Test
             this.lblCursorInfo.Size = new System.Drawing.Size(776, 20);
             this.lblCursorInfo.TabIndex = 5;
             this.lblCursorInfo.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.lblPageMin.AutoSize = true;
+            this.lblPageMin.Location = new System.Drawing.Point(440, 13);
+            this.lblPageMin.Name = "lblPageMin";
+            this.lblPageMin.Size = new System.Drawing.Size(45, 15);
+            this.lblPageMin.TabIndex = 6;
+            this.lblPageMin.Text = "每页:";
+            this.nudPageMin.Location = new System.Drawing.Point(488, 8);
+            this.nudPageMin.Name = "nudPageMin";
+            this.nudPageMin.Size = new System.Drawing.Size(50, 25);
+            this.nudPageMin.TabIndex = 7;
+            this.nudPageMin.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.nudPageMin.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
+            this.nudPageMin.Value = new decimal(new int[] { 1, 0, 0, 0 });
+            this.btnFit.Location = new System.Drawing.Point(550, 7);
+            this.btnFit.Name = "btnFit";
+            this.btnFit.Size = new System.Drawing.Size(60, 25);
+            this.btnFit.TabIndex = 8;
+            this.btnFit.Text = "适应";
+            this.btnFit.UseVisualStyleBackColor = true;
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 485);
@@ -109,6 +138,7 @@ namespace Test
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.panelBottom.ResumeLayout(false);
             this.panelBottom.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.nudPageMin)).EndInit();
             base.ResumeLayout(false);
         }
     }

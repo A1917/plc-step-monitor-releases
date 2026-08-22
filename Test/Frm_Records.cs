@@ -7,27 +7,31 @@ using System.Windows.Forms.DataVisualization.Charting;
 namespace Test
 {
     /// <summary>
-    /// 工位实时趋势图：某工位的步号-时间台阶曲线。
-    /// 交互：分页浏览（每页 2 分钟）、鼠标锚点缩放（X/Y 双轴）、框选缩放、
-    /// 单游标（可拖竖线，显示所停时刻的流程步号）、区域游标（双线高亮，显示区间时长）。
+    /// 工位实时趋势图：步号-时间台阶曲线。
+    /// 分页浏览（可设分钟数）、双轴锚点缩放、拖拽平移、单/区域游标、适应数据。
     /// </summary>
     public partial class Frm_Records : Form
     {
         private readonly int _station;
         private readonly Timer _timer;
         private readonly Series _series;
-        private readonly List<StepEvent> _events;   // 已加载事件（时间升序）
+        private readonly List<StepEvent> _events;       // 已加载事件（时间升序）
         private DateTime _lastPointTime;
         private bool _followTail = true;
 
-        private VerticalLineAnnotation _cursor;     // 单游标（橙）
-        private VerticalLineAnnotation _curStart;   // 区域开始（蓝）
-        private VerticalLineAnnotation _curEnd;     // 区域结束（蓝）
-        private RectangleAnnotation _rangeRect;     // 区域高亮
+        private VerticalLineAnnotation _cursor;         // 单游标（橙）
+        private VerticalLineAnnotation _curStart;       // 区域开始（蓝）
+        private VerticalLineAnnotation _curEnd;         // 区域结束（蓝）
+        private RectangleAnnotation _rangeRect;         // 区域高亮
+        private TextAnnotation _cursorLabel;            // 游标步号标签（跟随线）
+
+        private bool _isPanning;                        // 拖拽平移中
+        private Point _panStart;
+        private double _panViewStart;
 
         private const int RefreshIntervalMs = 500;
-        private const double PageSizeMs = 2 * 60 * 1000;              // 每页 2 分钟
-        private const double PageSizeDays = PageSizeMs / 86400000.0;  // OADate 单位
+        private double PageSizeMs => (double)nudPageMin.Value * 60 * 1000;
+        private double PageSizeDays => PageSizeMs / 86400000.0;
 
         public Frm_Records(int station)
         {
@@ -58,7 +62,6 @@ namespace Test
             area.AxisY.Title = "步号";
             area.AxisY.IsStartedFromZero = false;
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
-            // 十字光标（跟随鼠标）
             area.CursorX.IsUserEnabled = true;
             area.CursorX.IsUserSelectionEnabled = true;
             area.CursorY.IsUserEnabled = true;
@@ -67,25 +70,35 @@ namespace Test
             area.CursorY.LineColor = Color.FromArgb(120, 255, 0, 0);
             area.AxisX.ScaleView.Zoomable = true;
             area.AxisY.ScaleView.Zoomable = true;
-            // 数据点提示
             _series.ToolTip = "#VALX{yyyy-MM-dd HH:mm:ss.fff}\n步号 #VALY";
 
             chart1.MouseWheel += OnMouseWheel;
-            chart1.MouseMove += OnChartMouseMove;
             chart1.DoubleClick += (s, e) => FitWindow();
+            chart1.MouseDown += OnChartMouseDown;
+            chart1.MouseMove += OnChartMouseMove;
+            chart1.MouseUp += (s, e) => _isPanning = false;
 
             InitAnnotations();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(+1);
+            btnFit.Click += (s, e) => FitToData();
             chkCursor.CheckedChanged += (s, e) =>
             {
-                _cursor.Visible = chkCursor.Checked;
+                _cursor.Visible = _cursorLabel.Visible = chkCursor.Checked;
                 if (chkCursor.Checked) UpdateCursorInfo();
             };
             chkRange.CheckedChanged += (s, e) =>
             {
                 _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked;
                 if (chkRange.Checked) UpdateRangeInfo();
+            };
+            nudPageMin.ValueChanged += (s, e) =>
+            {
+                var view = area.AxisX.ScaleView;
+                view.Size = PageSizeDays;
+                _followTail = false;
+                SyncRangeRect();
+                UpdatePageLabel();
             };
 
             RebuildPoints();
@@ -95,88 +108,65 @@ namespace Test
             _timer.Tick += (s, e) =>
             {
                 RefreshChart();
-                if (chkCursor.Checked)
-                {
-                    UpdateCursorInfo();
-                }
-                if (chkRange.Checked)
-                {
-                    UpdateRangeInfo();
-                }
+                if (chkCursor.Checked) UpdateCursorInfo();
+                if (chkRange.Checked) UpdateRangeInfo();
             };
             _timer.Start();
             FormClosing += (s, e) => _timer.Stop();
         }
 
-        /// <summary>初始化游标注释（默认隐藏，勾选显示）</summary>
+        /// <summary>初始化游标注释</summary>
         private void InitAnnotations()
         {
             var area = chart1.ChartAreas[0];
             _cursor = new VerticalLineAnnotation
             {
-                AxisX = area.AxisX,
-                IsInfinitive = true,
-                ClipToChartArea = area.Name,
-                AllowMoving = true,
-                AllowSelecting = false,
-                LineColor = Color.Orange,
-                LineWidth = 2,
-                Visible = false
+                AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
+                AllowMoving = true, AllowSelecting = false, LineColor = Color.Orange,
+                LineWidth = 2, Visible = false
             };
-
             _curStart = new VerticalLineAnnotation
             {
-                AxisX = area.AxisX,
-                IsInfinitive = true,
-                ClipToChartArea = area.Name,
-                AllowMoving = true,
-                AllowSelecting = false,
-                LineColor = Color.DeepSkyBlue,
-                LineWidth = 2,
-                Visible = false
+                AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
+                AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
+                LineWidth = 2, Visible = false
             };
             _curEnd = new VerticalLineAnnotation
             {
-                AxisX = area.AxisX,
-                IsInfinitive = true,
-                ClipToChartArea = area.Name,
-                AllowMoving = true,
-                AllowSelecting = false,
-                LineColor = Color.DeepSkyBlue,
-                LineWidth = 2,
-                Visible = false
+                AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
+                AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
+                LineWidth = 2, Visible = false
             };
-
             _rangeRect = new RectangleAnnotation
             {
-                AxisX = area.AxisX,
-                AxisY = area.AxisY,
-                AllowMoving = false,
-                AllowResizing = false,
-                LineWidth = 0,
-                BackColor = Color.FromArgb(50, 100, 180, 255),
-                Visible = false
+                AxisX = area.AxisX, AxisY = area.AxisY,
+                AllowMoving = false, AllowResizing = false, LineWidth = 0,
+                BackColor = Color.FromArgb(50, 100, 180, 255), Visible = false
+            };
+            _cursorLabel = new TextAnnotation
+            {
+                AxisX = area.AxisX, ClipToChartArea = area.Name,
+                IsMultiline = false, BackColor = Color.Orange,
+                ForeColor = Color.White, Font = new Font("微软雅黑", 9f), Visible = false
             };
 
             chart1.Annotations.Add(_cursor);
             chart1.Annotations.Add(_curStart);
             chart1.Annotations.Add(_curEnd);
             chart1.Annotations.Add(_rangeRect);
+            chart1.Annotations.Add(_cursorLabel);
         }
 
-        /// <summary>重建曲线点（全量）</summary>
+        /// <summary>重建曲线点</summary>
         private void RebuildPoints()
         {
             chart1.SuspendLayout();
             _series.Points.Clear();
-            foreach (var e in _events)
-            {
-                _series.Points.AddXY(e.Time, e.Step);
-            }
+            foreach (var e in _events) _series.Points.AddXY(e.Time, e.Step);
             chart1.ResumeLayout();
         }
 
-        /// <summary>默认视图：最近 2 分钟（最后一页），并初始化游标位置</summary>
+        /// <summary>默认视图：最近 1 页</summary>
         private void FitWindow()
         {
             DateTime end = _events.Count > 0 ? _events[_events.Count - 1].Time : DateTime.Now;
@@ -184,7 +174,6 @@ namespace Test
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             view.Position = start.ToOADate();
             view.Size = PageSizeDays;
-
             double mid = view.Position + PageSizeDays / 2;
             _cursor.X = mid;
             _curStart.X = view.Position + PageSizeDays * 0.1;
@@ -196,22 +185,31 @@ namespace Test
             _followTail = true;
         }
 
-        /// <summary>增量拉取新事件；跟随模式保持窗口贴最新</summary>
+        /// <summary>适应数据：缩放到覆盖全部数据时间范围 + Y 轴自动</summary>
+        private void FitToData()
+        {
+            if (_events.Count == 0) return;
+            var area = chart1.ChartAreas[0];
+            double start = _events[0].Time.ToOADate();
+            double end = _events[_events.Count - 1].Time.ToOADate();
+            double size = Math.Max(end - start, 0.5 / 86400000.0);
+            area.AxisX.ScaleView.Position = start;
+            area.AxisX.ScaleView.Size = size;
+            area.AxisY.ScaleView.ZoomReset(0);
+            _followTail = false;
+            SyncRangeRect();
+            UpdatePageLabel();
+        }
+
+        /// <summary>增量拉取 + 跟随模式下窗口贴最新</summary>
         private void RefreshChart()
         {
             var fresh = EventStore.GetSince(_station, _lastPointTime);
-            if (fresh.Count == 0)
-            {
-                return;
-            }
+            if (fresh.Count == 0) return;
             _lastPointTime = fresh[fresh.Count - 1].Time;
             _events.AddRange(fresh);
-
             chart1.SuspendLayout();
-            foreach (var e in fresh)
-            {
-                _series.Points.AddXY(e.Time, e.Step);
-            }
+            foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
             if (_followTail)
             {
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
@@ -221,7 +219,7 @@ namespace Test
             UpdatePageLabel();
         }
 
-        /// <summary>分页移动：dir = -1 上一页 / +1 下一页；到最新页恢复跟随</summary>
+        /// <summary>分页移动</summary>
         private void PageMove(int dir)
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
@@ -244,7 +242,7 @@ namespace Test
             lblPage.Text = "窗口: " + s.ToString("HH:mm:ss") + " ~ " + e.ToString("HH:mm:ss");
         }
 
-        /// <summary>滚轮缩放：X/Y 双轴均以鼠标位置为锚点</summary>
+        /// <summary>滚轮缩放：X/Y 双轴锚点</summary>
         private void OnMouseWheel(object sender, MouseEventArgs e)
         {
             var area = chart1.ChartAreas[0];
@@ -263,15 +261,55 @@ namespace Test
             _followTail = false;
         }
 
-        /// <summary>单游标：显示所停时刻的流程步号</summary>
+        /// <summary>鼠标按下：游标在视野外时滚动到游标；否则开始拖拽平移</summary>
+        private void OnChartMouseDown(object sender, MouseEventArgs e)
+        {
+            var hit = chart1.HitTest(e.X, e.Y);
+            if (hit.ChartElementType == ChartElementType.Annotation && hit.Object is VerticalLineAnnotation va)
+            {
+                // 点击游标，若在视野外则滚动到视野内
+                double x = va.X;
+                var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                if (x < view.Position || x > view.Position + view.Size)
+                {
+                    view.Position = x - PageSizeDays / 2;
+                    _followTail = false;
+                    SyncRangeRect();
+                    UpdatePageLabel();
+                }
+                return;   // 注释拖动由 Chart 默认处理
+            }
+            // 开始拖拽平移
+            _isPanning = true;
+            _panStart = e.Location;
+            _panViewStart = chart1.ChartAreas[0].AxisX.ScaleView.Position;
+        }
+
+        /// <summary>鼠标移动：拖拽平移</summary>
+        private void OnChartMouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isPanning)
+            {
+                var area = chart1.ChartAreas[0];
+                double panDelta = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
+                area.AxisX.ScaleView.Position = _panViewStart + panDelta;
+                _followTail = false;
+                SyncRangeRect();
+                UpdatePageLabel();
+            }
+        }
+
+        /// <summary>游标信息更新：步号标签跟随线 + 底部信息栏</summary>
         private void UpdateCursorInfo()
         {
-            if (!chkCursor.Checked)
-            {
-                return;
-            }
+            if (!chkCursor.Checked) return;
+            var area = chart1.ChartAreas[0];
             DateTime t = DateTime.FromOADate(_cursor.X);
             short step = FindStepAt(t);
+            // 步号标签跟随游标线
+            _cursorLabel.AnchorX = _cursor.X;
+            _cursorLabel.AnchorY = area.AxisY.Maximum;
+            _cursorLabel.Text = "步号 " + step;
             string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + step;
             if (chkRange.Checked)
             {
@@ -282,14 +320,11 @@ namespace Test
             lblCursorInfo.Text = info;
         }
 
-        /// <summary>区域游标：更新高亮矩形与区间时长</summary>
+        /// <summary>区域游标：更新高亮矩形与底部信息</summary>
         private void UpdateRangeInfo()
         {
             SyncRangeRect();
-            if (!chkRange.Checked)
-            {
-                return;
-            }
+            if (!chkRange.Checked) return;
             DateTime t1 = DateTime.FromOADate(_curStart.X);
             DateTime t2 = DateTime.FromOADate(_curEnd.X);
             lblCursorInfo.Text = "区域 " + RangeText(t1, t2);
@@ -313,48 +348,17 @@ namespace Test
                    + "  时长 " + d.TotalSeconds.ToString("F3") + " s";
         }
 
-        /// <summary>二分查找：t 时刻所处的步号（最后一个 Time &lt;= t 的事件）</summary>
+        /// <summary>二分查找：t 时刻所处的步号</summary>
         private short FindStepAt(DateTime t)
         {
             int lo = 0, hi = _events.Count - 1, ans = -1;
             while (lo <= hi)
             {
                 int mid = (lo + hi) / 2;
-                if (_events[mid].Time <= t)
-                {
-                    ans = mid;
-                    lo = mid + 1;
-                }
-                else
-                {
-                    hi = mid - 1;
-                }
+                if (_events[mid].Time <= t) { ans = mid; lo = mid + 1; }
+                else hi = mid - 1;
             }
             return ans >= 0 ? _events[ans].Step : (short)-1;
-        }
-
-        /// <summary>鼠标移动：底部信息栏显示光标对应的时间与步号（未启用游标时用）</summary>
-        private void OnChartMouseMove(object sender, MouseEventArgs e)
-        {
-            if (lblCursorInfo == null)
-            {
-                return;
-            }
-            var area = chart1.ChartAreas[0];
-            try
-            {
-                double xVal = area.AxisX.PixelPositionToValue(e.X);
-                double yVal = area.AxisY.PixelPositionToValue(e.Y);
-                if (double.IsNaN(xVal) || double.IsNaN(yVal))
-                {
-                    return;
-                }
-                DateTime t = DateTime.FromOADate(xVal);
-                lblCursorInfo.Text = "时间: " + t.ToString("HH:mm:ss.fff") + "    步号: " + (short)Math.Round(yVal);
-            }
-            catch
-            {
-            }
         }
     }
 }
