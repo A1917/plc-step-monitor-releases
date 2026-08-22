@@ -164,13 +164,19 @@ namespace Test
             chart1.Annotations.Add(_rangeRect);
         }
 
-        /// <summary>重建曲线点</summary>
+        /// <summary>重建曲线点（try-finally 防布局挂起）</summary>
         private void RebuildPoints()
         {
             chart1.SuspendLayout();
-            _series.Points.Clear();
-            foreach (var e in _events) _series.Points.AddXY(e.Time, e.Step);
-            chart1.ResumeLayout();
+            try
+            {
+                _series.Points.Clear();
+                foreach (var e in _events) _series.Points.AddXY(e.Time, e.Step);
+            }
+            finally
+            {
+                chart1.ResumeLayout();
+            }
         }
 
         /// <summary>默认视图：最近 1 页，游标置于视野内</summary>
@@ -246,13 +252,19 @@ namespace Test
             _lastPointTime = fresh[fresh.Count - 1].Time;
             _events.AddRange(fresh);
             chart1.SuspendLayout();
-            foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
-            if (_followTail)
+            try
             {
-                var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
+                if (_followTail)
+                {
+                    var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                    view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                }
             }
-            chart1.ResumeLayout();
+            finally
+            {
+                chart1.ResumeLayout();
+            }
             UpdatePageLabel();
         }
 
@@ -365,13 +377,13 @@ namespace Test
                 : area.AxisY.ScaleView.Position;
         }
 
-        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（视野跟随鼠标方向）</summary>
+        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（X=内容跟随，Y=视野跟随）</summary>
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
-                double dx = (e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
+                double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
                 area.AxisX.ScaleView.Position = _panViewStart + dx;
                 double dy = (e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
                 area.AxisY.ScaleView.Position = _panYViewStart + dy;
@@ -409,29 +421,45 @@ namespace Test
             lblCursorInfo.Text = info;
         }
 
-        /// <summary>自绘游标步号标签（绘图区顶部，跟随游标线）</summary>
+        /// <summary>自绘游标步号标签（绘图区顶部，跟随游标线；区域线同样标注）</summary>
         private void OnChartPaint(object sender, PaintEventArgs e)
         {
-            if (!chkCursor.Checked || double.IsNaN(_cursor.X))
-            {
-                return;
-            }
             var area = chart1.ChartAreas[0];
-            short step = FindStepAt(SafeFromOADate(_cursor.X));
+            if (chkCursor.Checked && !double.IsNaN(_cursor.X))
+            {
+                DrawStepTag(e.Graphics, area, _cursor.X, Color.Orange);
+            }
+            if (chkRange.Checked)
+            {
+                if (!double.IsNaN(_curStart.X))
+                {
+                    DrawStepTag(e.Graphics, area, _curStart.X, Color.DeepSkyBlue);
+                }
+                if (!double.IsNaN(_curEnd.X))
+                {
+                    DrawStepTag(e.Graphics, area, _curEnd.X, Color.DeepSkyBlue);
+                }
+            }
+        }
+
+        /// <summary>在 xOADate 位置的绘图区顶部绘制「步号 N」标签</summary>
+        private void DrawStepTag(Graphics g, ChartArea area, double xOADate, Color bgColor)
+        {
+            short step = FindStepAt(SafeFromOADate(xOADate));
             string text = "步号 " + step;
-            double xPix = area.AxisX.ValueToPixelPosition(_cursor.X);
+            double xPix = area.AxisX.ValueToPixelPosition(xOADate);
             // Position 是百分比（0~100），换算像素需 /100
-            double topPix = area.Position.Y / 100 * chart1.Height + 2;   // 绘图区顶部
+            double topPix = area.Position.Y / 100 * chart1.Height + 2;
             double plotLeft = area.Position.X / 100 * chart1.Width;
 
-            using (var bg = new SolidBrush(Color.Orange))
+            using (var bg = new SolidBrush(bgColor))
             {
-                SizeF sz = e.Graphics.MeasureString(text, _labelFont);
+                SizeF sz = g.MeasureString(text, _labelFont);
                 float left = (float)xPix - sz.Width / 2 - 4;
                 if (left < plotLeft) left = (float)plotLeft;
                 var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
-                e.Graphics.FillRectangle(bg, rect);
-                e.Graphics.DrawString(text, _labelFont, Brushes.White, rect.X + 4, rect.Y + 2);
+                g.FillRectangle(bg, rect);
+                g.DrawString(text, _labelFont, Brushes.White, rect.X + 4, rect.Y + 2);
             }
         }
 
