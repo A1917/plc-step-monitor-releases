@@ -15,8 +15,8 @@ namespace Test
         private CheckBox chkCursor;
         private CheckBox chkRange;
         private Label lblCursorInfo;
-        private Label lblPageMin;
-        private NumericUpDown nudPageMin;
+        private Label lblPageSec;
+        private NumericUpDown nudPageSec;
         private Button btnFit;
 
         protected override void Dispose(bool disposing)
@@ -38,12 +38,12 @@ namespace Test
             this.chkCursor = new System.Windows.Forms.CheckBox();
             this.chkRange = new System.Windows.Forms.CheckBox();
             this.lblCursorInfo = new System.Windows.Forms.Label();
-            this.lblPageMin = new System.Windows.Forms.Label();
-            this.nudPageMin = new System.Windows.Forms.NumericUpDown();
+            this.lblPageSec = new System.Windows.Forms.Label();
+            this.nudPageSec = new System.Windows.Forms.NumericUpDown();
             this.btnFit = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.nudPageMin)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
             base.SuspendLayout();
             ChartArea chartArea1 = new ChartArea();
             chartArea1.Name = "ChartArea1";
@@ -58,8 +58,8 @@ namespace Test
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
             this.panelBottom.Controls.Add(this.btnFit);
-            this.panelBottom.Controls.Add(this.nudPageMin);
-            this.panelBottom.Controls.Add(this.lblPageMin);
+            this.panelBottom.Controls.Add(this.nudPageSec);
+            this.panelBottom.Controls.Add(this.lblPageSec);
             this.panelBottom.Controls.Add(this.lblCursorInfo);
             this.panelBottom.Controls.Add(this.chkRange);
             this.panelBottom.Controls.Add(this.chkCursor);
@@ -109,19 +109,19 @@ namespace Test
             this.lblCursorInfo.Size = new System.Drawing.Size(776, 20);
             this.lblCursorInfo.TabIndex = 5;
             this.lblCursorInfo.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            this.lblPageMin.AutoSize = true;
-            this.lblPageMin.Location = new System.Drawing.Point(440, 13);
-            this.lblPageMin.Name = "lblPageMin";
-            this.lblPageMin.Size = new System.Drawing.Size(45, 15);
-            this.lblPageMin.TabIndex = 6;
-            this.lblPageMin.Text = "每页:";
-            this.nudPageMin.Location = new System.Drawing.Point(488, 8);
-            this.nudPageMin.Name = "nudPageMin";
-            this.nudPageMin.Size = new System.Drawing.Size(50, 25);
-            this.nudPageMin.TabIndex = 7;
-            this.nudPageMin.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            this.nudPageMin.Maximum = new decimal(new int[] { 60, 0, 0, 0 });
-            this.nudPageMin.Value = new decimal(new int[] { 1, 0, 0, 0 });
+            this.lblPageSec.AutoSize = true;
+            this.lblPageSec.Location = new System.Drawing.Point(440, 13);
+            this.lblPageSec.Name = "lblPageSec";
+            this.lblPageSec.Size = new System.Drawing.Size(60, 15);
+            this.lblPageSec.TabIndex = 6;
+            this.lblPageSec.Text = "每页(s):";
+            this.nudPageSec.Location = new System.Drawing.Point(500, 8);
+            this.nudPageSec.Name = "nudPageSec";
+            this.nudPageSec.Size = new System.Drawing.Size(60, 25);
+            this.nudPageSec.TabIndex = 7;
+            this.nudPageSec.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
+            this.nudPageSec.Maximum = new decimal(new int[] { 3600, 0, 0, 0 });
+            this.nudPageSec.Value = new decimal(new int[] { 60, 0, 0, 0 });
             this.btnFit.Location = new System.Drawing.Point(550, 7);
             this.btnFit.Name = "btnFit";
             this.btnFit.Size = new System.Drawing.Size(60, 25);
@@ -138,7 +138,7 @@ namespace Test
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
             this.panelBottom.ResumeLayout(false);
             this.panelBottom.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.nudPageMin)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).EndInit();
             base.ResumeLayout(false);
         }
     }

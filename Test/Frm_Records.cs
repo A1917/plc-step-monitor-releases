@@ -28,9 +28,11 @@ namespace Test
         private bool _isPanning;                        // 拖拽平移中
         private Point _panStart;
         private double _panViewStart;
+        private double _panYViewStart;
+        private double _panYSizeStart;
 
         private const int RefreshIntervalMs = 500;
-        private double PageSizeMs => (double)nudPageMin.Value * 60 * 1000;
+        private double PageSizeMs => (double)nudPageSec.Value * 1000;
         private double PageSizeDays => PageSizeMs / 86400000.0;
 
         public Frm_Records(int station)
@@ -62,10 +64,11 @@ namespace Test
             area.AxisY.Title = "步号";
             area.AxisY.IsStartedFromZero = false;
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
+            area.AxisY.LabelStyle.Format = "0";                    // Y 轴整数显示（步号无小数）
             area.CursorX.IsUserEnabled = true;
-            area.CursorX.IsUserSelectionEnabled = true;
+            area.CursorX.IsUserSelectionEnabled = false;           // 取消左键框选（左键=拖拽平移）
             area.CursorY.IsUserEnabled = true;
-            area.CursorY.IsUserSelectionEnabled = true;
+            area.CursorY.IsUserSelectionEnabled = false;
             area.CursorX.LineColor = Color.FromArgb(120, 255, 0, 0);
             area.CursorY.LineColor = Color.FromArgb(120, 255, 0, 0);
             area.AxisX.ScaleView.Zoomable = true;
@@ -85,14 +88,20 @@ namespace Test
             chkCursor.CheckedChanged += (s, e) =>
             {
                 _cursor.Visible = _cursorLabel.Visible = chkCursor.Checked;
-                if (chkCursor.Checked) UpdateCursorInfo();
+                if (chkCursor.Checked)
+                {
+                    PlaceCursorsInView();
+                }
             };
             chkRange.CheckedChanged += (s, e) =>
             {
                 _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked;
-                if (chkRange.Checked) UpdateRangeInfo();
+                if (chkRange.Checked)
+                {
+                    PlaceCursorsInView();
+                }
             };
-            nudPageMin.ValueChanged += (s, e) =>
+            nudPageSec.ValueChanged += (s, e) =>
             {
                 var view = area.AxisX.ScaleView;
                 view.Size = PageSizeDays;
@@ -166,7 +175,7 @@ namespace Test
             chart1.ResumeLayout();
         }
 
-        /// <summary>默认视图：最近 1 页</summary>
+        /// <summary>默认视图：最近 1 页，游标置于视野内</summary>
         private void FitWindow()
         {
             DateTime end = _events.Count > 0 ? _events[_events.Count - 1].Time : DateTime.Now;
@@ -174,18 +183,25 @@ namespace Test
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             view.Position = start.ToOADate();
             view.Size = PageSizeDays;
-            double mid = view.Position + PageSizeDays / 2;
-            _cursor.X = mid;
-            _curStart.X = view.Position + PageSizeDays * 0.1;
-            _curEnd.X = view.Position + PageSizeDays * 0.9;
-            SyncRangeRect();
-            UpdateCursorInfo();
-            UpdateRangeInfo();
+            PlaceCursorsInView();
             UpdatePageLabel();
             _followTail = true;
         }
 
-        /// <summary>适应数据：缩放到覆盖全部数据时间范围 + Y 轴自动</summary>
+        /// <summary>把游标放置在当前视野中间（区域线在中心两侧留间隔）</summary>
+        private void PlaceCursorsInView()
+        {
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            double center = view.Position + view.Size / 2;
+            _cursor.X = center;
+            _curStart.X = center - view.Size * 0.15;
+            _curEnd.X = center + view.Size * 0.15;
+            SyncRangeRect();
+            UpdateCursorInfo();
+            UpdateRangeInfo();
+        }
+
+        /// <summary>适应数据：X 轴覆盖全部数据时间范围，Y 轴覆盖全部步号范围</summary>
         private void FitToData()
         {
             if (_events.Count == 0) return;
@@ -195,7 +211,16 @@ namespace Test
             double size = Math.Max(end - start, 0.5 / 86400000.0);
             area.AxisX.ScaleView.Position = start;
             area.AxisX.ScaleView.Size = size;
-            area.AxisY.ScaleView.ZoomReset(0);
+            // Y 轴覆盖全部步号范围（留 1 步余量）
+            short minY = short.MaxValue, maxY = short.MinValue;
+            foreach (var ev in _events)
+            {
+                if (ev.Step < minY) minY = ev.Step;
+                if (ev.Step > maxY) maxY = ev.Step;
+            }
+            double ySpan = Math.Max(maxY - minY, 1);
+            area.AxisY.ScaleView.Position = minY;
+            area.AxisY.ScaleView.Size = ySpan + 1;
             _followTail = false;
             SyncRangeRect();
             UpdatePageLabel();
@@ -279,20 +304,31 @@ namespace Test
                 }
                 return;   // 注释拖动由 Chart 默认处理
             }
-            // 开始拖拽平移
+            // 开始拖拽平移（X/Y 双轴）
+            var area = chart1.ChartAreas[0];
             _isPanning = true;
             _panStart = e.Location;
-            _panViewStart = chart1.ChartAreas[0].AxisX.ScaleView.Position;
+            _panViewStart = area.AxisX.ScaleView.Position;
+            // Y 轴缩放状态可能未激活（NaN），取当前可视范围作为平移基准
+            _panYSizeStart = double.IsNaN(area.AxisY.ScaleView.Size)
+                ? (area.AxisY.Maximum - area.AxisY.Minimum)
+                : area.AxisY.ScaleView.Size;
+            _panYViewStart = double.IsNaN(area.AxisY.ScaleView.Position)
+                ? area.AxisY.Minimum
+                : area.AxisY.ScaleView.Position;
         }
 
-        /// <summary>鼠标移动：拖拽平移</summary>
+        /// <summary>鼠标移动：拖拽平移 X/Y 双轴</summary>
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
-                double panDelta = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
-                area.AxisX.ScaleView.Position = _panViewStart + panDelta;
+                double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
+                area.AxisX.ScaleView.Position = _panViewStart + dx;
+                double dy = -(e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
+                area.AxisY.ScaleView.Position = _panYViewStart + dy;
+                area.AxisY.ScaleView.Size = _panYSizeStart;
                 _followTail = false;
                 SyncRangeRect();
                 UpdatePageLabel();
