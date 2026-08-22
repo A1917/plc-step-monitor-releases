@@ -30,6 +30,7 @@ namespace Test
         private double _panYViewStart;
         private double _panYSizeStart;
         private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
+        private Point _mousePos = new Point(-1, -1);     // 鼠标在图表上的位置（-1 = 不在图表）
 
         private const int RefreshIntervalMs = 500;
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
@@ -85,6 +86,11 @@ namespace Test
                 _isPanning = false;
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
+            };
+            chart1.MouseLeave += (s, e) =>
+            {
+                _mousePos = new Point(-1, -1);
+                chart1.Invalidate();
             };
             chart1.Paint += OnChartPaint;   // 自绘游标步号标签
 
@@ -230,7 +236,7 @@ namespace Test
             chart1.Invalidate();
         }
 
-        /// <summary>适应当前页：X 轴回到每页时长（右端不动），Y 轴适应当前窗口内数据的最小~最大步号</summary>
+        /// <summary>适应当前页：X/Y 轴四周预留空间（上下 10% 步数留白，左右数据范围留白）</summary>
         private void FitToData()
         {
             var area = chart1.ChartAreas[0];
@@ -239,15 +245,11 @@ namespace Test
             {
                 return;
             }
-            // X 轴：窗口宽度 = 每页时长，右端保持当前
-            double right = view.Position + view.Size;
-            view.Size = PageSizeDays;
-            view.Position = right - PageSizeDays;
-
-            // Y 轴：当前窗口内事件的最小~最大步号（留 1 步余量）
+            // 当前窗口内数据时间范围与步号范围
             DateTime t0 = SafeFromOADate(view.Position);
             DateTime t1 = SafeFromOADate(view.Position + view.Size);
             short minY = short.MaxValue, maxY = short.MinValue;
+            DateTime d0 = DateTime.MaxValue, d1 = DateTime.MinValue;
             bool found = false;
             foreach (var ev in _events)
             {
@@ -256,14 +258,37 @@ namespace Test
                 found = true;
                 if (ev.Step < minY) minY = ev.Step;
                 if (ev.Step > maxY) maxY = ev.Step;
+                if (ev.Time < d0) d0 = ev.Time;
+                if (ev.Time > d1) d1 = ev.Time;
             }
+
+            // X 轴：窗口 = 数据范围 + 左右 10% 留白（上限每页时长），数据居中
+            if (found)
+            {
+                double dataSpan = (d1 - d0).TotalDays;
+                double padX = dataSpan * 0.1;
+                double ideal = dataSpan + padX * 2;
+                if (ideal <= PageSizeDays)
+                {
+                    view.Size = Math.Max(ideal, 0.5 / 86400000.0);
+                    view.Position = d0.ToOADate() - padX;
+                }
+                else
+                {
+                    view.Size = PageSizeDays;
+                    view.Position = d1.ToOADate() - PageSizeDays;
+                }
+            }
+
+            // Y 轴：min~max 上下各 10% 留白（1000 步时顶部显示 ~1100）
             if (!found)
             {
                 minY = 0; maxY = 1;
             }
             double ySpan = Math.Max(maxY - minY, 1);
-            area.AxisY.ScaleView.Position = minY;
-            area.AxisY.ScaleView.Size = ySpan + 1;
+            double padY = ySpan * 0.1;
+            area.AxisY.ScaleView.Position = minY - padY;
+            area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
             _followTail = false;
             SyncRangeRect();
             UpdatePageLabel();
@@ -345,15 +370,19 @@ namespace Test
             double factor = e.Delta > 0 ? 0.8 : 1.25;
             var viewX = area.AxisX.ScaleView;
             double xSize = viewX.Size;
-            viewX.Position = mouseX - (mouseX - viewX.Position) * factor;
-            // X 窗口宽度上限 = 每页时长（缩小不能超过设定时间）
-            viewX.Size = Math.Min(Math.Max(xSize * factor, 0.5 / 86400000.0), PageSizeDays);
+            // 先算新宽度（含 clamp：下限 0.5ms / 上限每页时长），再按实际比例定锚点
+            double newXSize = Math.Min(Math.Max(xSize * factor, 0.5 / 86400000.0), PageSizeDays);
+            double fX = newXSize / xSize;
+            viewX.Position = mouseX - (mouseX - viewX.Position) * fX;
+            viewX.Size = newXSize;
 
             var viewY = area.AxisY.ScaleView;
             double ySize = double.IsNaN(viewY.Size) ? (area.AxisY.Maximum - area.AxisY.Minimum) : viewY.Size;
             double yPos = double.IsNaN(viewY.Position) ? area.AxisY.Minimum : viewY.Position;
-            viewY.Position = mouseY - (mouseY - yPos) * factor;
-            viewY.Size = Math.Max(ySize * factor, 1.0);
+            double newYSize = Math.Max(ySize * factor, 1.0);
+            double fY = newYSize / ySize;
+            viewY.Position = mouseY - (mouseY - yPos) * fY;
+            viewY.Size = newYSize;
             _followTail = false;
         }
 
@@ -403,9 +432,10 @@ namespace Test
                 : area.AxisY.ScaleView.Position;
         }
 
-        /// <summary>鼠标移动：拖拽平移 X/Y 双轴（X=内容跟随，Y=视野跟随）；锁定区域联动</summary>
+        /// <summary>鼠标移动：记录位置（步号标签跟随）；拖拽平移；锁定区域联动</summary>
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
+            _mousePos = e.Location;
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
@@ -526,14 +556,23 @@ namespace Test
             }
         }
 
-        /// <summary>在 xOADate 位置的绘图区顶部绘制「步号 N」标签（无数据时显示 --）</summary>
+        /// <summary>在 xOADate 位置的绘图区绘制「步号 N」标签（Y 位置跟随鼠标）</summary>
         private void DrawStepTag(Graphics g, ChartArea area, double xOADate, Color bgColor)
         {
             short step = FindStepAt(SafeFromOADate(xOADate));
             string text = step < 0 ? "步号 --" : "步号 " + step;
             double xPix = area.AxisX.ValueToPixelPosition(xOADate);
             // Position 是百分比（0~100），换算像素需 /100
-            double topPix = area.Position.Y / 100 * chart1.Height + 2;
+            double topPix;
+            if (_mousePos.Y >= 0 && _mousePos.X >= 0)
+            {
+                // 跟随鼠标：默认在鼠标上方，靠近顶部时翻到下方
+                topPix = _mousePos.Y > 26 ? _mousePos.Y - 24 : _mousePos.Y + 12;
+            }
+            else
+            {
+                topPix = area.Position.Y / 100 * chart1.Height + 2;   // 无鼠标时固定顶部
+            }
             double plotLeft = area.Position.X / 100 * chart1.Width;
 
             using (var bg = new SolidBrush(bgColor))
