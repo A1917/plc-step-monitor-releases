@@ -69,6 +69,7 @@
       <DependentUpon>Frm_Records.cs</DependentUpon>
     </Compile>
     <Compile Include="EventStore.cs" />
+    <Compile Include="Simulator.cs" />
     <Compile Include="PlcData.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

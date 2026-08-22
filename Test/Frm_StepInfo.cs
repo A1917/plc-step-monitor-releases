@@ -91,10 +91,26 @@ namespace Test
                         var result = PlcData.omronFinsNet.ReadInt16("D10002", (ushort)PlcData.StepCount);
                         if (result.IsSuccess)
                         {
-                            PlcData.ThdStep = result.Content;
-                            EventStore.Feed(result.Content);   // 步号变化事件入缓冲（趋势图数据源）
+                            short[] content = result.Content;
+                            int simStation = PlcData.StepCount - 1;
+                            if (Simulator.IsRunning && simStation >= 0 && simStation < content.Length)
+                            {
+                                content[simStation] = Simulator.CurrentValue;   // 保持模拟值（防事件冲突/显示跳变）
+                            }
+                            PlcData.ThdStep = content;
+                            EventStore.Feed(content);   // 步号变化事件入缓冲（趋势图数据源）
                             UpdateLabels();
                         }
+                    }
+                    else if (Simulator.IsRunning)
+                    {
+                        // 未连接但模拟运行：模拟工位值写入共享数组并刷新网格
+                        int sim = PlcData.StepCount - 1;
+                        if (sim >= 0 && sim < PlcData.ThdStep.Length)
+                        {
+                            PlcData.ThdStep[sim] = Simulator.CurrentValue;
+                        }
+                        UpdateLabels();
                     }
                 }
                 catch
@@ -130,9 +146,11 @@ namespace Test
                     {
                         return;
                     }
+                    int simStation = PlcData.StepCount - 1;
                     foreach (int idx in changed)
                     {
-                        labels[idx].Text = "工位" + idx + ":\n" + PlcData.ThdStep[idx];
+                        string prefix = (Simulator.IsRunning && idx == simStation) ? "模拟" + idx : "工位" + idx;
+                        labels[idx].Text = prefix + ":\n" + PlcData.ThdStep[idx];
                     }
                 });
             }

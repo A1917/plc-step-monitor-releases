@@ -60,6 +60,31 @@ namespace Test
             }
         }
 
+        /// <summary>
+        /// 单工位喂入（模拟器用）：对比上次步号，变化则生成事件；首次只建基线。
+        /// </summary>
+        public static void FeedSingle(int station, short step)
+        {
+            lock (_lock)
+            {
+                if (station < 0 || station >= _lastStep.Length)
+                {
+                    return;
+                }
+                if (!_initialized[station])
+                {
+                    _lastStep[station] = step;
+                    _initialized[station] = true;
+                    return;
+                }
+                if (step != _lastStep[station])
+                {
+                    _lastStep[station] = step;
+                    AddEvent(station, step);
+                }
+            }
+        }
+
         private static void AddEvent(int station, short step)
         {
             Queue<StepEvent> q;

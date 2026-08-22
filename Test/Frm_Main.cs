@@ -186,6 +186,19 @@ namespace Test
             catch (System.InvalidOperationException) { }
         }
 
+        /// <summary>模拟数据开关：驱动最后一个工位按模拟周期序列步进（验证趋势图/网格用）</summary>
+        private void chkSimulate_CheckedChanged(object sender, System.EventArgs e)
+        {
+            if (chkSimulate.Checked)
+            {
+                Simulator.Start(PlcData.StepCount - 1);
+            }
+            else
+            {
+                Simulator.Stop();
+            }
+        }
+
         private void Form1_Load(object sender, System.EventArgs e)
         {
             FormClosing += Form1_FormClosing;

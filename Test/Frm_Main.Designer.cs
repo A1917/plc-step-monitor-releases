@@ -16,6 +16,7 @@ namespace Test
         private TextBox textBox1;
         private Label lblPlcIp;
         private TextBox txtPlcIp;
+        private CheckBox chkSimulate;
 
         protected override void Dispose(bool disposing)
         {
@@ -39,6 +40,7 @@ namespace Test
             this.label2 = new System.Windows.Forms.Label();
             this.lblPlcIp = new System.Windows.Forms.Label();
             this.txtPlcIp = new System.Windows.Forms.TextBox();
+            this.chkSimulate = new System.Windows.Forms.CheckBox();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -67,6 +69,7 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.chkSimulate);
             this.panel1.Controls.Add(this.txtPlcIp);
             this.panel1.Controls.Add(this.lblPlcIp);
             this.panel1.Controls.Add(this.label2);
@@ -111,6 +114,14 @@ namespace Test
             this.txtPlcIp.Size = new System.Drawing.Size(130, 25);
             this.txtPlcIp.TabIndex = 9;
             this.txtPlcIp.Text = "192.168.1.50";
+            this.chkSimulate.AutoSize = true;
+            this.chkSimulate.Location = new System.Drawing.Point(228, 23);
+            this.chkSimulate.Name = "chkSimulate";
+            this.chkSimulate.Size = new System.Drawing.Size(89, 19);
+            this.chkSimulate.TabIndex = 10;
+            this.chkSimulate.Text = "模拟数据";
+            this.chkSimulate.UseVisualStyleBackColor = true;
+            this.chkSimulate.CheckedChanged += new System.EventHandler(chkSimulate_CheckedChanged);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);
