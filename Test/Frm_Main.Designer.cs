@@ -1,0 +1,110 @@
+﻿using System.ComponentModel;
+using System.Windows.Forms;
+
+namespace Test
+{
+    partial class Frm_Main
+    {
+        private IContainer components = null;
+        private Button btnConnect;
+        private Label lbConnectState;
+        private System.Windows.Forms.Timer timer1;
+        private Label label1;
+        private Panel panel1;
+        private Label lbl_MachineState;
+        private Label label2;
+        private TextBox textBox1;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+            this.btnConnect = new System.Windows.Forms.Button();
+            this.lbConnectState = new System.Windows.Forms.Label();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.label1 = new System.Windows.Forms.Label();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.lbl_MachineState = new System.Windows.Forms.Label();
+            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.panel1.SuspendLayout();
+            base.SuspendLayout();
+            this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.btnConnect.Location = new System.Drawing.Point(1081, 19);
+            this.btnConnect.Margin = new System.Windows.Forms.Padding(4);
+            this.btnConnect.Name = "btnConnect";
+            this.btnConnect.Size = new System.Drawing.Size(129, 26);
+            this.btnConnect.TabIndex = 0;
+            this.btnConnect.Text = "连接";
+            this.btnConnect.UseVisualStyleBackColor = true;
+            this.btnConnect.Click += new System.EventHandler(btnConnect_Click);
+            this.lbConnectState.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.lbConnectState.Location = new System.Drawing.Point(1232, 22);
+            this.lbConnectState.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lbConnectState.Name = "lbConnectState";
+            this.lbConnectState.Size = new System.Drawing.Size(100, 26);
+            this.lbConnectState.TabIndex = 1;
+            this.lbConnectState.Text = "未连接";
+            this.lbConnectState.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.timer1.Tick += new System.EventHandler(CheckHeartBeat);
+            this.label1.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.label1.BackColor = System.Drawing.Color.Red;
+            this.label1.Location = new System.Drawing.Point(1267, 1);
+            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(65, 16);
+            this.label1.TabIndex = 2;
+            this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.label2);
+            this.panel1.Controls.Add(this.textBox1);
+            this.panel1.Controls.Add(this.lbl_MachineState);
+            this.panel1.Controls.Add(this.lbConnectState);
+            this.panel1.Controls.Add(this.label1);
+            this.panel1.Controls.Add(this.btnConnect);
+            this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panel1.Location = new System.Drawing.Point(0, 0);
+            this.panel1.Margin = new System.Windows.Forms.Padding(4);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(1336, 53);
+            this.panel1.TabIndex = 4;
+            this.lbl_MachineState.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.lbl_MachineState.Location = new System.Drawing.Point(938, 19);
+            this.lbl_MachineState.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.lbl_MachineState.Name = "lbl_MachineState";
+            this.lbl_MachineState.Size = new System.Drawing.Size(100, 26);
+            this.lbl_MachineState.TabIndex = 5;
+            this.lbl_MachineState.Text = "未连接";
+            this.lbl_MachineState.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.textBox1.Location = new System.Drawing.Point(875, 19);
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(56, 25);
+            this.textBox1.TabIndex = 6;
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(785, 24);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(75, 15);
+            this.label2.TabIndex = 7;
+            this.label2.Text = "线程个数:";
+            base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
+            base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            base.ClientSize = new System.Drawing.Size(1336, 778);
+            base.Controls.Add(this.panel1);
+            base.IsMdiContainer = true;
+            base.Margin = new System.Windows.Forms.Padding(4);
+            base.Name = "Frm_Main";
+            this.Text = "Form1";
+            base.Load += new System.EventHandler(Form1_Load);
+            this.panel1.ResumeLayout(false);
+            this.panel1.PerformLayout();
+            base.ResumeLayout(false);
+        }
+    }
+}
