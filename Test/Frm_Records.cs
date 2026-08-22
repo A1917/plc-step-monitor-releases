@@ -262,25 +262,41 @@ namespace Test
         private void UpdatePageLabel()
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
-            DateTime s = DateTime.FromOADate(view.Position);
-            DateTime e = DateTime.FromOADate(view.Position + view.Size);
-            lblPage.Text = "窗口: " + s.ToString("HH:mm:ss") + " ~ " + e.ToString("HH:mm:ss");
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size))
+            {
+                lblPage.Text = "窗口: --:--:-- ~ --:--:--";
+                return;
+            }
+            try
+            {
+                DateTime s = DateTime.FromOADate(view.Position);
+                DateTime e = DateTime.FromOADate(view.Position + view.Size);
+                lblPage.Text = "窗口: " + s.ToString("HH:mm:ss") + " ~ " + e.ToString("HH:mm:ss");
+            }
+            catch
+            {
+                lblPage.Text = "窗口: --:--:-- ~ --:--:--";
+            }
         }
 
-        /// <summary>滚轮缩放：X/Y 双轴锚点</summary>
+        /// <summary>滚轮缩放：X/Y 双轴锚点（鼠标在绘图区外时跳过，防 NaN）</summary>
         private void OnMouseWheel(object sender, MouseEventArgs e)
         {
             var area = chart1.ChartAreas[0];
+            double mouseX = area.AxisX.PixelPositionToValue(e.X);
+            double mouseY = area.AxisY.PixelPositionToValue(e.Y);
+            if (double.IsNaN(mouseX) || double.IsNaN(mouseY))
+            {
+                return;   // 鼠标不在绘图区，跳过本次缩放
+            }
             double factor = e.Delta > 0 ? 0.8 : 1.25;
             var viewX = area.AxisX.ScaleView;
             double xSize = viewX.Size;
-            double mouseX = area.AxisX.PixelPositionToValue(e.X);
             viewX.Position = mouseX - (mouseX - viewX.Position) * factor;
             viewX.Size = Math.Max(xSize * factor, 0.5 / 86400000.0);
 
             var viewY = area.AxisY.ScaleView;
             double ySize = double.IsNaN(viewY.Size) ? (area.AxisY.Maximum - area.AxisY.Minimum) : viewY.Size;
-            double mouseY = area.AxisY.PixelPositionToValue(e.Y);
             viewY.Position = mouseY - (mouseY - viewY.Position) * factor;
             viewY.Size = Math.Max(ySize * factor, 1.0);
             _followTail = false;
@@ -335,12 +351,22 @@ namespace Test
             }
         }
 
+        /// <summary>安全 OADate 转换（NaN/越界返回 MinValue，防 FromOADate 抛异常）</summary>
+        private static DateTime SafeFromOADate(double v)
+        {
+            if (double.IsNaN(v) || v < 0 || v > 2958465.99)
+            {
+                return DateTime.MinValue;
+            }
+            return DateTime.FromOADate(v);
+        }
+
         /// <summary>游标信息更新：步号标签跟随线 + 底部信息栏</summary>
         private void UpdateCursorInfo()
         {
             if (!chkCursor.Checked) return;
             var area = chart1.ChartAreas[0];
-            DateTime t = DateTime.FromOADate(_cursor.X);
+            DateTime t = SafeFromOADate(_cursor.X);
             short step = FindStepAt(t);
             // 步号标签跟随游标线
             _cursorLabel.AnchorX = _cursor.X;
@@ -349,8 +375,8 @@ namespace Test
             string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + step;
             if (chkRange.Checked)
             {
-                DateTime t1 = DateTime.FromOADate(_curStart.X);
-                DateTime t2 = DateTime.FromOADate(_curEnd.X);
+                DateTime t1 = SafeFromOADate(_curStart.X);
+                DateTime t2 = SafeFromOADate(_curEnd.X);
                 info += "   |   " + RangeText(t1, t2);
             }
             lblCursorInfo.Text = info;
@@ -361,8 +387,8 @@ namespace Test
         {
             SyncRangeRect();
             if (!chkRange.Checked) return;
-            DateTime t1 = DateTime.FromOADate(_curStart.X);
-            DateTime t2 = DateTime.FromOADate(_curEnd.X);
+            DateTime t1 = SafeFromOADate(_curStart.X);
+            DateTime t2 = SafeFromOADate(_curEnd.X);
             lblCursorInfo.Text = "区域 " + RangeText(t1, t2);
         }
 
