@@ -31,6 +31,7 @@ namespace Test
         private double _panYSizeStart;
 
         private const int RefreshIntervalMs = 500;
+        private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
         private double PageSizeMs => (double)nudPageSec.Value * 1000;
         private double PageSizeDays => PageSizeMs / 86400000.0;
 
@@ -120,8 +121,9 @@ namespace Test
             _timer.Tick += (s, e) =>
             {
                 RefreshChart();
+                // 游标信息已含区域信息；区域仅在未开游标时单独显示（防覆盖）
                 if (chkCursor.Checked) UpdateCursorInfo();
-                if (chkRange.Checked) UpdateRangeInfo();
+                else if (chkRange.Checked) UpdateRangeInfo();
             };
             _timer.Start();
             FormClosing += (s, e) => _timer.Stop();
@@ -254,9 +256,13 @@ namespace Test
             UpdatePageLabel();
         }
 
-        /// <summary>分页移动</summary>
+        /// <summary>分页移动（无数据时直接返回，防 MinValue 越界）</summary>
         private void PageMove(int dir)
         {
+            if (_events.Count == 0 || _lastPointTime == DateTime.MinValue)
+            {
+                return;
+            }
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             view.Position += dir * PageSizeDays;
             _followTail = false;
@@ -307,7 +313,8 @@ namespace Test
 
             var viewY = area.AxisY.ScaleView;
             double ySize = double.IsNaN(viewY.Size) ? (area.AxisY.Maximum - area.AxisY.Minimum) : viewY.Size;
-            viewY.Position = mouseY - (mouseY - viewY.Position) * factor;
+            double yPos = double.IsNaN(viewY.Position) ? area.AxisY.Minimum : viewY.Position;
+            viewY.Position = mouseY - (mouseY - yPos) * factor;
             viewY.Size = Math.Max(ySize * factor, 1.0);
             _followTail = false;
         }
@@ -413,18 +420,18 @@ namespace Test
             short step = FindStepAt(SafeFromOADate(_cursor.X));
             string text = "步号 " + step;
             double xPix = area.AxisX.ValueToPixelPosition(_cursor.X);
-            double topPix = area.Position.Y * chart1.Height + 2;   // 绘图区顶部
+            // Position 是百分比（0~100），换算像素需 /100
+            double topPix = area.Position.Y / 100 * chart1.Height + 2;   // 绘图区顶部
+            double plotLeft = area.Position.X / 100 * chart1.Width;
 
-            using (var font = new Font("微软雅黑", 9f))
             using (var bg = new SolidBrush(Color.Orange))
             {
-                SizeF sz = e.Graphics.MeasureString(text, font);
+                SizeF sz = e.Graphics.MeasureString(text, _labelFont);
                 float left = (float)xPix - sz.Width / 2 - 4;
-                float plotLeft = (float)(area.Position.X * chart1.Width);
-                if (left < plotLeft) left = plotLeft;
+                if (left < plotLeft) left = (float)plotLeft;
                 var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
                 e.Graphics.FillRectangle(bg, rect);
-                e.Graphics.DrawString(text, font, Brushes.White, rect.X + 4, rect.Y + 2);
+                e.Graphics.DrawString(text, _labelFont, Brushes.White, rect.X + 4, rect.Y + 2);
             }
         }
 
@@ -441,12 +448,14 @@ namespace Test
         private void SyncRangeRect()
         {
             var area = chart1.ChartAreas[0];
+            double yMin = double.IsNaN(area.AxisY.Minimum) ? 0 : area.AxisY.Minimum;
+            double yMax = double.IsNaN(area.AxisY.Maximum) ? 1 : area.AxisY.Maximum;
             double x1 = Math.Min(_curStart.X, _curEnd.X);
             double x2 = Math.Max(_curStart.X, _curEnd.X);
             _rangeRect.X = x1;
             _rangeRect.Width = x2 - x1;
-            _rangeRect.Y = area.AxisY.Minimum;
-            _rangeRect.Height = Math.Max(area.AxisY.Maximum - area.AxisY.Minimum, 1);
+            _rangeRect.Y = yMin;
+            _rangeRect.Height = Math.Max(yMax - yMin, 1);
         }
 
         private string RangeText(DateTime t1, DateTime t2)
