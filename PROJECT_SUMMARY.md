@@ -63,7 +63,8 @@
 7. **步耗时记录+趋势图（已规划 2026-08-22，待实施）**：
    - 需求：记录每工位每流程步耗时→本地；**周期判定=模式学习指纹法**（非"回到0"）：学习前2~3轮步号转移序列提取稳定起始指纹（如 0→10），检测到指纹重复即新周期；中间 0→1000 等不误切；起始步序不稳定时升级前缀聚类（接口预留可替换）
    - 设计：按工位独立 CycleDetector（可替换边界判定接口：指纹法默认→前缀聚类升级）；StepRecorder 挂轮询线程喂数据；CSV UTF-8 BOM 按天分文件（明细 steps_/汇总 cycles_）；Frm_Records 用内置 Chart 控件（无需 NuGet）**实时滚动+周期分色** + DataGridView TopN（默认10）
-   - 实施顺序：CycleDetector(纯逻辑可测)→StepRecorder+RecordsStore→Frm_Records(实时趋势+表格)→主界面记录按钮+起始步配置→仿真联调→现场实测
+   - 交互（2026-08-22 确认）：工位格子**保持 Label + 双击**打开该工位实时趋势图（非模态 Show，不阻塞监控），视觉零回归；触摸屏场景将来可切无边框 Button 单击（代码预留切换开关）
+   - 实施顺序：CycleDetector(纯逻辑可测)→StepRecorder+RecordsStore→Frm_Records(实时趋势+表格)→工位 Label 双击接入→主界面记录按钮+起始步配置→仿真联调→现场实测
 
 ## 五、版本管理（本次重建）
 - 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程分支 `v2-optimized`（A1917/plc-step-monitor）
