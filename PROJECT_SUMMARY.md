@@ -54,12 +54,14 @@
 - 此版 HslCommunication.dll 的 Modbus TCP 类型名是 `ModbusTcpNet`（新版文档叫 ModbusTcpClient），本项目暂只用到 OmronFinsNet
 
 ## 四、待办 / 待确认
-1. **工位数确认**：现按原代码读 50 个（D10002~D10051）；若 PLC 侧工位更多，改 `PlcData.StepCount` 并调网格行数即可
-2. `textBox1`「线程个数:」输入框原版未接线（无事件），如需动态设工位数属新增功能，另行讨论
+1. ~~工位数确认~~：✅ 2026-08-22 主界面「工位数:」输入框接线，连接时应用（默认 50，上限 200，动态重建网格），不再硬编码
+2. ~~textBox1 未接线~~：✅ 已接线为工位数配置（原「线程个数:」标签改「工位数:」）
 3. `StepHistoryItem` 半成品未接入（步描述/时长编辑功能，暂不做）
 4. 命名：项目名 Test/窗体 Frm_Main 可后续语义化（涉及 sln/csproj 联动，本次未动）
 5. 旧仓库 /root/plc-step-monitor（四层版+StepTimer）保留未动，可随时 git archive 取用
+6. PLC IP 已开放主界面（txtPlcIp，默认 192.168.1.50），端口固定 9600；如需端口可配再加
 
 ## 五、版本管理（本次重建）
-- 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程推送待用户确认（force push 替换 A1917/plc-step-monitor 旧历史，或推新分支）
-- 打包：`Test_优化版_0822.zip`（排除 bin/obj/.vs/.git）
+- 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程分支 `v2-optimized`（A1917/plc-step-monitor）
+- 交付流程：编译 → push v2-optimized → GitHub Release 上传运行包（浏览器下载解压即用，工作电脑零安装）
+- Release 历史：v0.1-optimized（恢复+优化基线）、v0.2-config（IP+工位数配置）
