@@ -8,13 +8,16 @@ using HslCommunication.Profinet.Omron;
 namespace Test
 {
     /// <summary>
-    /// 主窗体：连接/断开控制、心跳监控、设备状态显示，MDI 容器承载工位监控子窗体。
+    /// 主窗体：PLC IP/工位数配置、连接/断开控制、心跳监控、设备状态显示，MDI 容器承载工位监控子窗体。
     /// </summary>
     public partial class Frm_Main : Form
     {
+        private const int PlcPort = 9600;                 // FINS-TCP 固定端口
+
         private bool isConnected;
         private Thread _stateThd;                          // 设备状态轮询线程（1s 一次）
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private Frm_StepInfo _stepInfo;                    // 工位监控子窗体
 
         public Frm_Main()
         {
@@ -25,13 +28,13 @@ namespace Test
         /// <summary>创建并显示工位监控子窗体（MDI）</summary>
         private void InitializeChildForm()
         {
-            var stepInfo = new Frm_StepInfo
+            _stepInfo = new Frm_StepInfo
             {
                 MdiParent = this,
                 Dock = DockStyle.Fill,
                 TopMost = false
             };
-            stepInfo.Show();
+            _stepInfo.Show();
         }
 
         /// <summary>连接 / 断开切换</summary>
@@ -56,10 +59,29 @@ namespace Test
 
         private void ConnectPlc()
         {
-            if (PlcData.omronFinsNet == null)
+            // 读取主界面配置：PLC IP + 工位数
+            string ip = txtPlcIp.Text.Trim();
+            if (string.IsNullOrEmpty(ip))
             {
-                PlcData.omronFinsNet = new OmronFinsNet("192.168.1.50", 9600);
+                ip = "192.168.1.50";
+                txtPlcIp.Text = ip;
             }
+            if (!int.TryParse(textBox1.Text.Trim(), out int stepCount) || stepCount <= 0)
+            {
+                stepCount = 50;
+                textBox1.Text = "50";
+            }
+            if (stepCount > 200)
+            {
+                MessageBox.Show("工位数过大（上限 200）");
+                return;
+            }
+
+            // 应用工位数（重建子窗体网格 + 数据数组）
+            _stepInfo.ApplyConfig(stepCount);
+
+            // 按 IP 创建客户端并连接
+            PlcData.omronFinsNet = new OmronFinsNet(ip, PlcPort);
             OperateResult result = PlcData.omronFinsNet.ConnectServer();
             if (result.IsSuccess)
             {
@@ -73,6 +95,7 @@ namespace Test
             }
             else
             {
+                PlcData.omronFinsNet = null;
                 MessageBox.Show("连接失败：" + result.Message);
             }
         }
@@ -84,6 +107,7 @@ namespace Test
             {
                 PlcData.omronFinsNet.ConnectClose();
             }
+            PlcData.omronFinsNet = null;      // 置空，重连时按新 IP 重建
             isConnected = false;
             PlcData.IsConnected = false;
             btnConnect.Text = "连接";

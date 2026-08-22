@@ -14,6 +14,8 @@ namespace Test
         private Label lbl_MachineState;
         private Label label2;
         private TextBox textBox1;
+        private Label lblPlcIp;
+        private TextBox txtPlcIp;
 
         protected override void Dispose(bool disposing)
         {
@@ -35,6 +37,8 @@ namespace Test
             this.lbl_MachineState = new System.Windows.Forms.Label();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
+            this.lblPlcIp = new System.Windows.Forms.Label();
+            this.txtPlcIp = new System.Windows.Forms.TextBox();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -63,6 +67,8 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.txtPlcIp);
+            this.panel1.Controls.Add(this.lblPlcIp);
             this.panel1.Controls.Add(this.label2);
             this.panel1.Controls.Add(this.textBox1);
             this.panel1.Controls.Add(this.lbl_MachineState);
@@ -83,16 +89,28 @@ namespace Test
             this.lbl_MachineState.TabIndex = 5;
             this.lbl_MachineState.Text = "未连接";
             this.lbl_MachineState.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            this.textBox1.Location = new System.Drawing.Point(875, 19);
+            this.textBox1.Location = new System.Drawing.Point(858, 19);
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(56, 25);
+            this.textBox1.Size = new System.Drawing.Size(64, 25);
             this.textBox1.TabIndex = 6;
+            this.textBox1.Text = "50";
             this.label2.AutoSize = true;
             this.label2.Location = new System.Drawing.Point(785, 24);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(75, 15);
             this.label2.TabIndex = 7;
-            this.label2.Text = "线程个数:";
+            this.label2.Text = "工位数:";
+            this.lblPlcIp.AutoSize = true;
+            this.lblPlcIp.Location = new System.Drawing.Point(15, 24);
+            this.lblPlcIp.Name = "lblPlcIp";
+            this.lblPlcIp.Size = new System.Drawing.Size(59, 15);
+            this.lblPlcIp.TabIndex = 8;
+            this.lblPlcIp.Text = "PLC IP:";
+            this.txtPlcIp.Location = new System.Drawing.Point(78, 19);
+            this.txtPlcIp.Name = "txtPlcIp";
+            this.txtPlcIp.Size = new System.Drawing.Size(130, 25);
+            this.txtPlcIp.TabIndex = 9;
+            this.txtPlcIp.Text = "192.168.1.50";
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);

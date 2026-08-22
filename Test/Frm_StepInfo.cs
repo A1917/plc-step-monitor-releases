@@ -8,39 +8,60 @@ namespace Test
 {
     /// <summary>
     /// 工位监控子窗体：以网格实时显示各工位当前流程步号（一个寄存器 = 一个工位）。
+    /// 工位数由主界面配置，连接时通过 ApplyConfig 动态重建网格。
     /// </summary>
     public partial class Frm_StepInfo : Form
     {
-        private const int StepCount = PlcData.StepCount;   // 工位数（与 PlcData 一致）
         private const int PollIntervalMs = 100;            // 轮询周期：10 次/秒
+        private const int GridColumns = 10;                // 网格固定 10 列
 
         private Thread _thdUpdate;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
-        private readonly Label[] labels = new Label[StepCount];
-        private readonly short[] lastStep = new short[StepCount];
+        private Label[] labels = new Label[PlcData.StepCount];
+        private short[] lastStep = new short[PlcData.StepCount];
 
         public Frm_StepInfo()
         {
             InitializeComponent();
-            InitializeStepLayout();
+            RebuildGrid(PlcData.StepCount);
         }
 
-        /// <summary>按工位数初始化 5 行 x 10 列网格</summary>
-        private void InitializeStepLayout()
+        /// <summary>
+        /// 应用主界面配置（工位数）：更新 PlcData 并重建数据数组与网格。
+        /// 由主窗体在连接前调用。
+        /// </summary>
+        public void ApplyConfig(int stepCount)
         {
-            tblayout_Step.RowCount = 5;
-            tblayout_Step.ColumnCount = 10;
+            PlcData.StepCount = stepCount;
+            PlcData.ThdStep = new short[stepCount];
+            RebuildGrid(stepCount);
+        }
+
+        /// <summary>按工位数重建网格（固定 10 列，行数自适应）</summary>
+        private void RebuildGrid(int count)
+        {
+            int rows = (count + GridColumns - 1) / GridColumns;
+
+            tblayout_Step.SuspendLayout();
+            tblayout_Step.Controls.Clear();
             tblayout_Step.RowStyles.Clear();
             tblayout_Step.ColumnStyles.Clear();
-            for (int r = 0; r < 5; r++)
+            tblayout_Step.RowCount = rows;
+            tblayout_Step.ColumnCount = GridColumns;
+
+            float rowPercent = 100f / rows;
+            for (int r = 0; r < rows; r++)
             {
-                tblayout_Step.RowStyles.Add(new RowStyle(SizeType.Percent, 20f));
+                tblayout_Step.RowStyles.Add(new RowStyle(SizeType.Percent, rowPercent));
             }
-            for (int c = 0; c < 10; c++)
+            for (int c = 0; c < GridColumns; c++)
             {
-                tblayout_Step.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 10f));
+                tblayout_Step.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / GridColumns));
             }
-            for (int i = 0; i < StepCount; i++)
+
+            labels = new Label[count];
+            lastStep = new short[count];
+            for (int i = 0; i < count; i++)
             {
                 labels[i] = new Label
                 {
@@ -51,8 +72,9 @@ namespace Test
                     BorderStyle = BorderStyle.FixedSingle,
                     Text = "工位" + i + ":\n0"
                 };
-                tblayout_Step.Controls.Add(labels[i], i % 10, i / 10);
+                tblayout_Step.Controls.Add(labels[i], i % GridColumns, i / GridColumns);
             }
+            tblayout_Step.ResumeLayout();
         }
 
         /// <summary>轮询循环：批量读取步值寄存器 D10002 起连续 StepCount 个字</summary>
@@ -64,7 +86,7 @@ namespace Test
                 {
                     if (PlcData.IsConnected && PlcData.omronFinsNet != null)
                     {
-                        var result = PlcData.omronFinsNet.ReadInt16("D10002", StepCount);
+                        var result = PlcData.omronFinsNet.ReadInt16("D10002", (ushort)PlcData.StepCount);
                         if (result.IsSuccess)
                         {
                             PlcData.ThdStep = result.Content;
@@ -84,7 +106,8 @@ namespace Test
         private void UpdateLabels()
         {
             var changed = new List<int>();
-            for (int i = 0; i < StepCount; i++)
+            int count = Math.Min(lastStep.Length, PlcData.ThdStep.Length);
+            for (int i = 0; i < count; i++)
             {
                 if (lastStep[i] != PlcData.ThdStep[i])
                 {
