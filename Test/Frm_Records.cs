@@ -331,14 +331,15 @@ namespace Test
                 return;   // 注释拖动由 Chart 默认处理
             }
             // 只在绘图区内启动拖拽平移（轴区/图例区不干扰）
+            // Position/InnerPlotPosition 均为百分比（0~100），换算像素需 /100
             var ca = chart1.ChartAreas[0];
             var outer = ca.Position;
             var inner = ca.InnerPlotPosition;
             var plotRect = new Rectangle(
-                (int)(chart1.Width * (outer.X + outer.Width * inner.X / 100)),
-                (int)(chart1.Height * (outer.Y + outer.Height * inner.Y / 100)),
-                (int)(chart1.Width * outer.Width * inner.Width / 100),
-                (int)(chart1.Height * outer.Height * inner.Height / 100));
+                (int)(chart1.Width * (outer.X + outer.Width * inner.X / 100) / 100),
+                (int)(chart1.Height * (outer.Y + outer.Height * inner.Y / 100) / 100),
+                (int)(chart1.Width * outer.Width * inner.Width / 10000),
+                (int)(chart1.Height * outer.Height * inner.Height / 10000));
             if (!plotRect.Contains(e.Location))
             {
                 return;
