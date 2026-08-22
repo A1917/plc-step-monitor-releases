@@ -23,7 +23,6 @@ namespace Test
         private VerticalLineAnnotation _curStart;       // 区域开始（蓝）
         private VerticalLineAnnotation _curEnd;         // 区域结束（蓝）
         private RectangleAnnotation _rangeRect;         // 区域高亮
-        private TextAnnotation _cursorLabel;            // 游标步号标签（跟随线）
 
         private bool _isPanning;                        // 拖拽平移中
         private Point _panStart;
@@ -80,6 +79,7 @@ namespace Test
             chart1.MouseDown += OnChartMouseDown;
             chart1.MouseMove += OnChartMouseMove;
             chart1.MouseUp += (s, e) => _isPanning = false;
+            chart1.Paint += OnChartPaint;   // 自绘游标步号标签
 
             InitAnnotations();
             btnPrev.Click += (s, e) => PageMove(-1);
@@ -87,7 +87,8 @@ namespace Test
             btnFit.Click += (s, e) => FitToData();
             chkCursor.CheckedChanged += (s, e) =>
             {
-                _cursor.Visible = _cursorLabel.Visible = chkCursor.Checked;
+                _cursor.Visible = chkCursor.Checked;
+                chart1.Invalidate();
                 if (chkCursor.Checked)
                 {
                     PlaceCursorsInView();
@@ -154,26 +155,11 @@ namespace Test
                 AllowMoving = false, AllowResizing = false, LineWidth = 0,
                 BackColor = Color.FromArgb(50, 100, 180, 255), Visible = false
             };
-            _cursorLabel = new TextAnnotation
-            {
-                AxisX = area.AxisX,
-                AxisY = area.AxisY,                       // 必须显式绑定双轴，否则不显示
-                ClipToChartArea = area.Name,
-                Width = 90,                               // 像素尺寸（默认 0 宽不可见）
-                Height = 20,
-                IsMultiline = false,
-                BackColor = Color.Orange,
-                ForeColor = Color.White,
-                Font = new Font("微软雅黑", 9f),
-                AnchorAlignment = ContentAlignment.TopCenter,   // 锚点上方居中
-                Visible = false
-            };
 
             chart1.Annotations.Add(_cursor);
             chart1.Annotations.Add(_curStart);
             chart1.Annotations.Add(_curEnd);
             chart1.Annotations.Add(_rangeRect);
-            chart1.Annotations.Add(_cursorLabel);
         }
 
         /// <summary>重建曲线点</summary>
@@ -211,22 +197,36 @@ namespace Test
             UpdateRangeInfo();
         }
 
-        /// <summary>适应数据：X 轴覆盖全部数据时间范围，Y 轴覆盖全部步号范围</summary>
+        /// <summary>适应当前页：X 轴回到每页时长（右端不动），Y 轴适应当前窗口内数据的最小~最大步号</summary>
         private void FitToData()
         {
-            if (_events.Count == 0) return;
             var area = chart1.ChartAreas[0];
-            double start = _events[0].Time.ToOADate();
-            double end = _events[_events.Count - 1].Time.ToOADate();
-            double size = Math.Max(end - start, 0.5 / 86400000.0);
-            area.AxisX.ScaleView.Position = start;
-            area.AxisX.ScaleView.Size = size;
-            // Y 轴覆盖全部步号范围（留 1 步余量）
+            var view = area.AxisX.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size))
+            {
+                return;
+            }
+            // X 轴：窗口宽度 = 每页时长，右端保持当前
+            double right = view.Position + view.Size;
+            view.Size = PageSizeDays;
+            view.Position = right - PageSizeDays;
+
+            // Y 轴：当前窗口内事件的最小~最大步号（留 1 步余量）
+            DateTime t0 = SafeFromOADate(view.Position);
+            DateTime t1 = SafeFromOADate(view.Position + view.Size);
             short minY = short.MaxValue, maxY = short.MinValue;
+            bool found = false;
             foreach (var ev in _events)
             {
+                if (ev.Time < t0) continue;
+                if (ev.Time >= t1) break;
+                found = true;
                 if (ev.Step < minY) minY = ev.Step;
                 if (ev.Step > maxY) maxY = ev.Step;
+            }
+            if (!found)
+            {
+                minY = 0; maxY = 1;
             }
             double ySpan = Math.Max(maxY - minY, 1);
             area.AxisY.ScaleView.Position = minY;
@@ -312,7 +312,7 @@ namespace Test
             _followTail = false;
         }
 
-        /// <summary>鼠标按下：游标在视野外时滚动到游标；否则开始拖拽平移</summary>
+        /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标</summary>
         private void OnChartMouseDown(object sender, MouseEventArgs e)
         {
             var hit = chart1.HitTest(e.X, e.Y);
@@ -329,6 +329,19 @@ namespace Test
                     UpdatePageLabel();
                 }
                 return;   // 注释拖动由 Chart 默认处理
+            }
+            // 只在绘图区内启动拖拽平移（轴区/图例区不干扰）
+            var ca = chart1.ChartAreas[0];
+            var outer = ca.Position;
+            var inner = ca.InnerPlotPosition;
+            var plotRect = new Rectangle(
+                (int)(chart1.Width * (outer.X + outer.Width * inner.X / 100)),
+                (int)(chart1.Height * (outer.Y + outer.Height * inner.Y / 100)),
+                (int)(chart1.Width * outer.Width * inner.Width / 100),
+                (int)(chart1.Height * outer.Height * inner.Height / 100));
+            if (!plotRect.Contains(e.Location))
+            {
+                return;
             }
             // 开始拖拽平移（X/Y 双轴）
             var area = chart1.ChartAreas[0];
@@ -378,11 +391,6 @@ namespace Test
             var area = chart1.ChartAreas[0];
             DateTime t = SafeFromOADate(_cursor.X);
             short step = FindStepAt(t);
-            // 步号标签跟随游标线
-            _cursorLabel.AnchorX = _cursor.X;
-            double topY = double.IsNaN(area.AxisY.Maximum) ? 100 : area.AxisY.Maximum;
-            _cursorLabel.AnchorY = topY;
-            _cursorLabel.Text = "步号 " + step;
             string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + step;
             if (chkRange.Checked)
             {
@@ -391,6 +399,32 @@ namespace Test
                 info += "   |   " + RangeText(t1, t2);
             }
             lblCursorInfo.Text = info;
+        }
+
+        /// <summary>自绘游标步号标签（绘图区顶部，跟随游标线）</summary>
+        private void OnChartPaint(object sender, PaintEventArgs e)
+        {
+            if (!chkCursor.Checked || double.IsNaN(_cursor.X))
+            {
+                return;
+            }
+            var area = chart1.ChartAreas[0];
+            short step = FindStepAt(SafeFromOADate(_cursor.X));
+            string text = "步号 " + step;
+            double xPix = area.AxisX.ValueToPixelPosition(_cursor.X);
+            double topPix = area.Position.Y * chart1.Height + 2;   // 绘图区顶部
+
+            using (var font = new Font("微软雅黑", 9f))
+            using (var bg = new SolidBrush(Color.Orange))
+            {
+                SizeF sz = e.Graphics.MeasureString(text, font);
+                float left = (float)xPix - sz.Width / 2 - 4;
+                float plotLeft = (float)(area.Position.X * chart1.Width);
+                if (left < plotLeft) left = plotLeft;
+                var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
+                e.Graphics.FillRectangle(bg, rect);
+                e.Graphics.DrawString(text, font, Brushes.White, rect.X + 4, rect.Y + 2);
+            }
         }
 
         /// <summary>区域游标：更新高亮矩形与底部信息</summary>
