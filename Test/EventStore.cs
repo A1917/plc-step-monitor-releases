@@ -115,6 +115,28 @@ namespace Test
             }
         }
 
+        /// <summary>取某工位 [from, to) 时间范围内的事件（趋势图拖拽查看历史区间用）</summary>
+        public static List<StepEvent> GetRange(int station, DateTime from, DateTime to)
+        {
+            lock (_lock)
+            {
+                var result = new List<StepEvent>();
+                Queue<StepEvent> q;
+                if (!_buffers.TryGetValue(station, out q))
+                {
+                    return result;
+                }
+                foreach (var e in q)
+                {
+                    if (e.Time >= from && e.Time < to)
+                    {
+                        result.Add(e);
+                    }
+                }
+                return result;
+            }
+        }
+
         /// <summary>清空全部缓冲（重建网格/断开重连时调用）</summary>
         public static void Clear()
         {
