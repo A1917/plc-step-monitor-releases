@@ -179,14 +179,21 @@ namespace Test
             }
         }
 
-        /// <summary>默认视图：最近 1 页，游标置于视野内</summary>
+        /// <summary>默认视图：最近 1 页，游标置于视野内（无数据时初始化合理轴范围）</summary>
         private void FitWindow()
         {
+            var area = chart1.ChartAreas[0];
             DateTime end = _events.Count > 0 ? _events[_events.Count - 1].Time : DateTime.Now;
             DateTime start = end.AddMilliseconds(-PageSizeMs);
-            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            var view = area.AxisX.ScaleView;
             view.Position = start.ToOADate();
             view.Size = PageSizeDays;
+            if (_events.Count == 0)
+            {
+                // 无数据：显式给 Y 轴合理范围，避免轴 NaN 导致图表白屏
+                area.AxisY.ScaleView.Position = 0;
+                area.AxisY.ScaleView.Size = 10;
+            }
             PlaceCursorsInView();
             UpdatePageLabel();
             _followTail = true;
@@ -411,7 +418,8 @@ namespace Test
             var area = chart1.ChartAreas[0];
             DateTime t = SafeFromOADate(_cursor.X);
             short step = FindStepAt(t);
-            string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + step;
+            string stepText = step < 0 ? "--" : step.ToString();
+            string info = "游标 " + t.ToString("HH:mm:ss.fff") + "  步号 " + stepText;
             if (chkRange.Checked)
             {
                 DateTime t1 = SafeFromOADate(_curStart.X);
@@ -425,6 +433,19 @@ namespace Test
         private void OnChartPaint(object sender, PaintEventArgs e)
         {
             var area = chart1.ChartAreas[0];
+            if (_events.Count == 0)
+            {
+                // 无数据提示
+                using (var font = new Font("微软雅黑", 12f))
+                using (var brush = new SolidBrush(Color.Gray))
+                {
+                    string msg = "暂无数据";
+                    SizeF sz = e.Graphics.MeasureString(msg, font);
+                    e.Graphics.DrawString(msg, font, brush,
+                        (chart1.Width - sz.Width) / 2, (chart1.Height - sz.Height) / 2);
+                }
+                return;
+            }
             if (chkCursor.Checked && !double.IsNaN(_cursor.X))
             {
                 DrawStepTag(e.Graphics, area, _cursor.X, Color.Orange);
@@ -442,11 +463,11 @@ namespace Test
             }
         }
 
-        /// <summary>在 xOADate 位置的绘图区顶部绘制「步号 N」标签</summary>
+        /// <summary>在 xOADate 位置的绘图区顶部绘制「步号 N」标签（无数据时显示 --）</summary>
         private void DrawStepTag(Graphics g, ChartArea area, double xOADate, Color bgColor)
         {
             short step = FindStepAt(SafeFromOADate(xOADate));
-            string text = "步号 " + step;
+            string text = step < 0 ? "步号 --" : "步号 " + step;
             double xPix = area.AxisX.ValueToPixelPosition(xOADate);
             // Position 是百分比（0~100），换算像素需 /100
             double topPix = area.Position.Y / 100 * chart1.Height + 2;
