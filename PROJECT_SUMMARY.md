@@ -60,6 +60,10 @@
 4. 命名：项目名 Test/窗体 Frm_Main 可后续语义化（涉及 sln/csproj 联动，本次未动）
 5. 旧仓库 /root/plc-step-monitor（四层版+StepTimer）保留未动，可随时 git archive 取用
 6. PLC IP 已开放主界面（txtPlcIp，默认 192.168.1.50），端口固定 9600；如需端口可配再加
+7. **步耗时记录+趋势图（已规划 2026-08-22，待实施）**：
+   - 需求：记录每工位每流程步耗时→本地；周期=步号回落起始步(默认0，可配)即结束（非固定步数）；趋势图+最大耗时排行
+   - 设计：按工位独立 CycleDetector（回落判定+大步回退兜底+预热丢弃）；StepRecorder 挂轮询线程喂数据；CSV UTF-8 BOM 按天分文件（明细 steps_/汇总 cycles_）；Frm_Records 用内置 Chart 控件（无需 NuGet）多周期叠加 + DataGridView TopN
+   - 实施顺序：CycleDetector(纯逻辑可测)→StepRecorder+RecordsStore→Frm_Records→主界面记录按钮+起始步配置→仿真联调→现场实测
 
 ## 五、版本管理（本次重建）
 - 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程分支 `v2-optimized`（A1917/plc-step-monitor）
