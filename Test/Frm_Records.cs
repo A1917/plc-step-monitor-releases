@@ -436,6 +436,11 @@ namespace Test
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             _mousePos = e.Location;
+            // 游标/区域开启时实时刷新标签（跟随鼠标，拖动游标时不被遮挡）
+            if ((chkCursor.Checked || chkRange.Checked) && _events.Count > 0)
+            {
+                chart1.Invalidate();
+            }
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
@@ -498,7 +503,7 @@ namespace Test
             lblCursorInfo.Text = info;
         }
 
-        /// <summary>自绘游标步号标签（绘图区顶部，跟随游标线；区域线同样标注）</summary>
+        /// <summary>自绘游标/区域步号标签（多标签重叠自动分层错开，Y 跟随鼠标）</summary>
         private void OnChartPaint(object sender, PaintEventArgs e)
         {
             var area = chart1.ChartAreas[0];
@@ -515,32 +520,110 @@ namespace Test
                 }
                 return;
             }
+            var tags = new List<TagItem>();
             if (chkCursor.Checked && !double.IsNaN(_cursor.X))
             {
-                DrawStepTag(e.Graphics, area, _cursor.X, Color.Orange);
+                tags.Add(new TagItem(_cursor.X, StepText(_cursor.X), Color.Orange));
             }
             if (chkRange.Checked)
             {
                 if (!double.IsNaN(_curStart.X))
                 {
-                    DrawStepTag(e.Graphics, area, _curStart.X, Color.DeepSkyBlue);
+                    tags.Add(new TagItem(_curStart.X, StepText(_curStart.X), Color.DeepSkyBlue));
                 }
                 if (!double.IsNaN(_curEnd.X))
                 {
-                    DrawStepTag(e.Graphics, area, _curEnd.X, Color.DeepSkyBlue);
+                    tags.Add(new TagItem(_curEnd.X, StepText(_curEnd.X), Color.DeepSkyBlue));
                 }
                 DrawRangeDuration(e.Graphics, area);   // 区域时长画在图表内
             }
+            if (tags.Count > 0)
+            {
+                DrawStepTags(e.Graphics, area, tags);
+            }
         }
 
-        /// <summary>区域时长文本画在区域中间（顶部标签行下方）</summary>
+        private struct TagItem
+        {
+            public double X;
+            public string Text;
+            public Color Color;
+            public TagItem(double x, string text, Color color) { X = x; Text = text; Color = color; }
+        }
+
+        private string StepText(double xOADate)
+        {
+            short step = FindStepAt(SafeFromOADate(xOADate));
+            return step < 0 ? "步号 --" : "步号 " + step;
+        }
+
+        /// <summary>分层绘制步号标签：基准 Y 跟随鼠标（避免遮挡），重叠标签自动向下错开</summary>
+        private void DrawStepTags(Graphics g, ChartArea area, List<TagItem> tags)
+        {
+            double baseY;
+            if (_mousePos.Y >= 0 && _mousePos.X >= 0)
+            {
+                // 跟随鼠标：默认在鼠标上方，靠近顶部时翻到下方
+                baseY = _mousePos.Y > 26 ? _mousePos.Y - 24 : _mousePos.Y + 12;
+            }
+            else
+            {
+                baseY = area.Position.Y / 100 * chart1.Height + 2;   // 无鼠标时固定顶部
+            }
+            double plotLeft = area.Position.X / 100 * chart1.Width;
+
+            // 计算每个标签像素范围
+            var items = new List<TagLayout>();
+            foreach (var t in tags)
+            {
+                float xPix = (float)area.AxisX.ValueToPixelPosition(t.X);
+                SizeF sz = g.MeasureString(t.Text, _labelFont);
+                float l = xPix - sz.Width / 2 - 4;
+                if (l < plotLeft) l = (float)plotLeft;
+                items.Add(new TagLayout(l, l + sz.Width + 8, t.Text, t.Color));
+            }
+            items.Sort((a, b) => a.Left.CompareTo(b.Left));
+
+            // 贪心分层：每层记录最右边界，重叠则放下层（自动调整 Y）
+            var layers = new List<float>();
+            foreach (var it in items)
+            {
+                int li = 0;
+                for (; li < layers.Count; li++)
+                {
+                    if (it.Left > layers[li] + 4) break;   // 4px 间隔
+                }
+                if (li == layers.Count) layers.Add(it.Right);
+                else layers[li] = it.Right;
+
+                float y = (float)baseY + li * 24;
+                using (var bg = new SolidBrush(it.Color))
+                {
+                    var rect = new RectangleF(it.Left, y, it.Right - it.Left, 20);
+                    g.FillRectangle(bg, rect);
+                    g.DrawString(it.Text, _labelFont, Brushes.White, it.Left + 4, y + 2);
+                }
+            }
+        }
+
+        private struct TagLayout
+        {
+            public float Left;
+            public float Right;
+            public string Text;
+            public Color Color;
+            public TagLayout(float left, float right, string text, Color color)
+            { Left = left; Right = right; Text = text; Color = color; }
+        }
+
+        /// <summary>区域时长文本画在区域中间（顶部标签行下方），单位 ms</summary>
         private void DrawRangeDuration(Graphics g, ChartArea area)
         {
             double x1 = Math.Min(_curStart.X, _curEnd.X);
             double x2 = Math.Max(_curStart.X, _curEnd.X);
             double midX = (x1 + x2) / 2;
             double durMs = (x2 - x1) * 86400000.0;
-            string text = durMs.ToString("F3") + " s";
+            string text = durMs.ToString("F0") + " ms";
             double xPix = area.AxisX.ValueToPixelPosition(midX);
             double topPix = area.Position.Y / 100 * chart1.Height + 24;   // 标签行下方
 
@@ -549,36 +632,6 @@ namespace Test
                 SizeF sz = g.MeasureString(text, _labelFont);
                 float left = (float)xPix - sz.Width / 2 - 4;
                 double plotLeft = area.Position.X / 100 * chart1.Width;
-                if (left < plotLeft) left = (float)plotLeft;
-                var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
-                g.FillRectangle(bg, rect);
-                g.DrawString(text, _labelFont, Brushes.White, rect.X + 4, rect.Y + 2);
-            }
-        }
-
-        /// <summary>在 xOADate 位置的绘图区绘制「步号 N」标签（Y 位置跟随鼠标）</summary>
-        private void DrawStepTag(Graphics g, ChartArea area, double xOADate, Color bgColor)
-        {
-            short step = FindStepAt(SafeFromOADate(xOADate));
-            string text = step < 0 ? "步号 --" : "步号 " + step;
-            double xPix = area.AxisX.ValueToPixelPosition(xOADate);
-            // Position 是百分比（0~100），换算像素需 /100
-            double topPix;
-            if (_mousePos.Y >= 0 && _mousePos.X >= 0)
-            {
-                // 跟随鼠标：默认在鼠标上方，靠近顶部时翻到下方
-                topPix = _mousePos.Y > 26 ? _mousePos.Y - 24 : _mousePos.Y + 12;
-            }
-            else
-            {
-                topPix = area.Position.Y / 100 * chart1.Height + 2;   // 无鼠标时固定顶部
-            }
-            double plotLeft = area.Position.X / 100 * chart1.Width;
-
-            using (var bg = new SolidBrush(bgColor))
-            {
-                SizeF sz = g.MeasureString(text, _labelFont);
-                float left = (float)xPix - sz.Width / 2 - 4;
                 if (left < plotLeft) left = (float)plotLeft;
                 var rect = new RectangleF(left, (float)topPix, sz.Width + 8, sz.Height + 4);
                 g.FillRectangle(bg, rect);
@@ -599,8 +652,14 @@ namespace Test
         private void SyncRangeRect()
         {
             var area = chart1.ChartAreas[0];
-            double yMin = double.IsNaN(area.AxisY.Minimum) ? 0 : area.AxisY.Minimum;
-            double yMax = double.IsNaN(area.AxisY.Maximum) ? 1 : area.AxisY.Maximum;
+            // 用 ScaleView 可视范围（含 NaN/Infinity 防护），保证矩形覆盖整个绘图区
+            var viewY = area.AxisY.ScaleView;
+            double yMin = viewY.Position;
+            double yMax = viewY.Position + viewY.Size;
+            if (double.IsNaN(yMin) || double.IsInfinity(yMin)) yMin = area.AxisY.Minimum;
+            if (double.IsNaN(yMax) || double.IsInfinity(yMax)) yMax = area.AxisY.Maximum;
+            if (double.IsNaN(yMin) || double.IsInfinity(yMin)) yMin = 0;
+            if (double.IsNaN(yMax) || double.IsInfinity(yMax)) yMax = 100;
             double x1 = Math.Min(_curStart.X, _curEnd.X);
             double x2 = Math.Max(_curStart.X, _curEnd.X);
             _rangeRect.X = x1;
@@ -613,7 +672,7 @@ namespace Test
         {
             TimeSpan d = (t2 - t1).Duration();
             return t1.ToString("HH:mm:ss.fff") + " ~ " + t2.ToString("HH:mm:ss.fff")
-                   + "  时长 " + d.TotalSeconds.ToString("F3") + " s";
+                   + "  时长 " + d.TotalMilliseconds.ToString("F0") + " ms";
         }
 
         /// <summary>二分查找：t 时刻所处的步号</summary>
