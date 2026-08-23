@@ -35,7 +35,8 @@ namespace Test
         private bool _draggingAnnotation;                 // 正在拖动游标/区域线
         private float _labelBaseY = -1;                   // 标签基准 Y（拖动时更新，松开保持，-1=用顶部）
 
-        private const int RefreshIntervalMs = 500;
+        private const int RefreshIntervalMs = 100;          // 100ms 刷新（丝滑）
+        private const int MaxEvents = 60000;                // 窗体事件上限（防长时间累积卡顿）
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
         private double PageSizeMs => (double)nudPageSec.Value * 1000;
         private double PageSizeDays => PageSizeMs / 86400000.0;
@@ -90,6 +91,14 @@ namespace Test
                 _draggingAnnotation = false;   // 松开：标签保持当前 Y（_labelBaseY 记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
+                // 拖到最右端 → 进入跟随模式
+                var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                if (_events.Count > 0 && view.Position + view.Size >= _lastPointTime.ToOADate())
+                {
+                    _followTail = true;
+                    DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
+                    view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                }
             };
             chart1.MouseLeave += (s, e) =>
             {
@@ -311,7 +320,7 @@ namespace Test
             double padY = ySpan * 0.1;
             area.AxisY.ScaleView.Position = minY - padY;
             area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
-            _followTail = false;
+            _followTail = true;   // 适应后进入跟随模式
             SyncRangeRect();
             UpdatePageLabel();
         }
@@ -374,17 +383,37 @@ namespace Test
             try
             {
                 var fresh = EventStore.GetSince(_station, _lastPointTime);
-                if (fresh.Count == 0) return;
+                if (fresh.Count == 0)
+                {
+                    // 无新事件：跟随模式窗口仍随时间平滑滚动（防"卡死"感）
+                    if (_followTail)
+                    {
+                        var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                        DateTime tail = DateTime.Now;
+                        view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                    }
+                    return;
+                }
                 _lastPointTime = fresh[fresh.Count - 1].Time;
                 _events.AddRange(fresh);
                 chart1.SuspendLayout();
                 try
                 {
                     foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
+                    // 内存上限保护：超出删除最老（分页/历史查看止于数据起点，更早靠记录加载）
+                    if (_events.Count > MaxEvents)
+                    {
+                        int remove = _events.Count - MaxEvents;
+                        _events.RemoveRange(0, remove);
+                        // Points 无批量删除 API，重建（低频触发，可接受）
+                        _series.Points.Clear();
+                        foreach (var ev in _events) _series.Points.AddXY(ev.Time, ev.Step);
+                    }
                     if (_followTail)
                     {
                         var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                        view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                        DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
+                        view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
                     }
                 }
                 finally
