@@ -120,6 +120,10 @@ namespace Test
             nudPageSec.ValueChanged += (s, e) =>
             {
                 var view = area.AxisX.ScaleView;
+                if (double.IsNaN(view.Position) || double.IsNaN(view.Size))
+                {
+                    return;   // 视图未初始化，跳过
+                }
                 double right = view.Position + view.Size;   // 保持窗口右端不动，仅改宽度
                 view.Size = PageSizeDays;
                 view.Position = right - PageSizeDays;
@@ -357,32 +361,39 @@ namespace Test
             }
         }
 
-        /// <summary>增量拉取 + 跟随模式下窗口贴最新（历史加载模式暂停增量）</summary>
+        /// <summary>增量拉取 + 跟随模式下窗口贴最新（历史加载模式暂停增量；异常防护防 UI 卡死）</summary>
         private void RefreshChart()
         {
             if (_loadingFromFile)
             {
                 return;   // 历史模式：不追加实时数据
             }
-            var fresh = EventStore.GetSince(_station, _lastPointTime);
-            if (fresh.Count == 0) return;
-            _lastPointTime = fresh[fresh.Count - 1].Time;
-            _events.AddRange(fresh);
-            chart1.SuspendLayout();
             try
             {
-                foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
-                if (_followTail)
+                var fresh = EventStore.GetSince(_station, _lastPointTime);
+                if (fresh.Count == 0) return;
+                _lastPointTime = fresh[fresh.Count - 1].Time;
+                _events.AddRange(fresh);
+                chart1.SuspendLayout();
+                try
                 {
-                    var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                    view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                    foreach (var e in fresh) _series.Points.AddXY(e.Time, e.Step);
+                    if (_followTail)
+                    {
+                        var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                        view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                    }
                 }
+                finally
+                {
+                    chart1.ResumeLayout();
+                }
+                UpdatePageLabel();
             }
-            finally
+            catch
             {
-                chart1.ResumeLayout();
+                // 任何异常不中断 Timer 消息循环（锁屏唤醒/数据异常时防止界面无响应）
             }
-            UpdatePageLabel();
         }
 
         /// <summary>分页移动（无数据时直接返回，防 MinValue 越界）</summary>
@@ -581,40 +592,53 @@ namespace Test
         /// <summary>自绘游标/区域步号标签（多标签重叠自动分层错开，Y 跟随鼠标）</summary>
         private void OnChartPaint(object sender, PaintEventArgs e)
         {
-            var area = chart1.ChartAreas[0];
-            if (_events.Count == 0)
+            // 整体防护：锁屏/睡眠唤醒后布局可能未就绪，ValueToPixelPosition 会抛异常，
+            // 未捕获会导致 UI 消息循环中断（界面无响应）。异常时跳过自绘标签即可。
+            try
             {
-                // 无数据提示
-                using (var font = new Font("微软雅黑", 12f))
-                using (var brush = new SolidBrush(Color.Gray))
+                var area = chart1.ChartAreas[0];
+                if (_events.Count == 0)
                 {
-                    string msg = "暂无数据";
-                    SizeF sz = e.Graphics.MeasureString(msg, font);
-                    e.Graphics.DrawString(msg, font, brush,
-                        (chart1.Width - sz.Width) / 2, (chart1.Height - sz.Height) / 2);
+                    // 无数据提示
+                    using (var font = new Font("微软雅黑", 12f))
+                    using (var brush = new SolidBrush(Color.Gray))
+                    {
+                        string msg = "暂无数据";
+                        SizeF sz = e.Graphics.MeasureString(msg, font);
+                        e.Graphics.DrawString(msg, font, brush,
+                            (chart1.Width - sz.Width) / 2, (chart1.Height - sz.Height) / 2);
+                    }
+                    return;
                 }
-                return;
-            }
-            var tags = new List<TagItem>();
-            if (chkCursor.Checked && !double.IsNaN(_cursor.X))
-            {
-                tags.Add(new TagItem(_cursor.X, StepText(_cursor.X), Color.Orange));
-            }
-            if (chkRange.Checked)
-            {
-                if (!double.IsNaN(_curStart.X))
+                var tags = new List<TagItem>();
+                if (chkCursor.Checked && !double.IsNaN(_cursor.X))
                 {
-                    tags.Add(new TagItem(_curStart.X, StepText(_curStart.X), Color.DeepSkyBlue));
+                    tags.Add(new TagItem(_cursor.X, StepText(_cursor.X), Color.Orange));
                 }
-                if (!double.IsNaN(_curEnd.X))
+                if (chkRange.Checked)
                 {
-                    tags.Add(new TagItem(_curEnd.X, StepText(_curEnd.X), Color.DeepSkyBlue));
+                    if (!double.IsNaN(_curStart.X))
+                    {
+                        tags.Add(new TagItem(_curStart.X, StepText(_curStart.X), Color.DeepSkyBlue));
+                    }
+                    if (!double.IsNaN(_curEnd.X))
+                    {
+                        tags.Add(new TagItem(_curEnd.X, StepText(_curEnd.X), Color.DeepSkyBlue));
+                    }
+                    DrawRangeDuration(e.Graphics, area);   // 区域时长画在图表内
                 }
-                DrawRangeDuration(e.Graphics, area);   // 区域时长画在图表内
+                if (tags.Count > 0)
+                {
+                    DrawStepTags(e.Graphics, area, tags);
+                }
             }
-            if (tags.Count > 0)
+            catch (InvalidOperationException)
             {
-                DrawStepTags(e.Graphics, area, tags);
+                // 图表布局未就绪（唤醒/缩放中），跳过自绘，Chart 自身绘制不受影响
+            }
+            catch
+            {
+                // 其他绘制异常同样跳过，绝不中断 UI 消息循环
             }
         }
 
