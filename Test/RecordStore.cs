@@ -5,17 +5,17 @@ using System.Text;
 namespace Test
 {
     /// <summary>
-    /// 步号事件持久化：主界面「记录」开关 ON 时，把步号变化事件追加写入
-    /// records/events_YYYYMMDD.csv（UTF-8 BOM，按天分文件）。
+    /// 步号事件持久化：主界面「记录」开关每开启一次，新建一份独立记录文件
+    /// records/events_yyyyMMdd_HHmmss_fff.csv（UTF-8 BOM）。
     /// 格式：时间(yyyy-MM-dd HH:mm:ss.fff),工位,步号
     /// </summary>
     public static class RecordStore
     {
         private static readonly object _lock = new object();
-        private static string _currentFile = string.Empty;
+        private static string _sessionFile = string.Empty;   // 本次开启会话的文件（含路径）
 
-        /// <summary>记录开关（主界面控制）</summary>
-        public static bool Enabled { get; set; }
+        /// <summary>记录中</summary>
+        public static bool Enabled { get; private set; }
 
         /// <summary>记录目录 = exe 所在目录/records</summary>
         public static string RecordsDir
@@ -28,10 +28,33 @@ namespace Test
             }
         }
 
+        /// <summary>开始记录会话：新建独立文件（每次开启 = 新的一份）</summary>
+        public static void Start()
+        {
+            lock (_lock)
+            {
+                Directory.CreateDirectory(RecordsDir);
+                string name = "events_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".csv";
+                _sessionFile = Path.Combine(RecordsDir, name);
+                File.WriteAllText(_sessionFile, "时间,工位,步号\r\n", new UTF8Encoding(true));   // 表头
+                Enabled = true;
+            }
+        }
+
+        /// <summary>停止记录会话</summary>
+        public static void Stop()
+        {
+            lock (_lock)
+            {
+                Enabled = false;
+                _sessionFile = string.Empty;
+            }
+        }
+
         /// <summary>写入一条事件（EventStore 变化时调用，线程安全）</summary>
         public static void Write(int station, DateTime time, short step)
         {
-            if (!Enabled)
+            if (!Enabled || _sessionFile.Length == 0)
             {
                 return;
             }
@@ -39,15 +62,8 @@ namespace Test
             {
                 try
                 {
-                    Directory.CreateDirectory(RecordsDir);
-                    string file = Path.Combine(RecordsDir, "events_" + time.ToString("yyyyMMdd") + ".csv");
-                    bool needHeader = !File.Exists(file);
-                    using (var sw = new StreamWriter(file, true, new UTF8Encoding(true)))
+                    using (var sw = new StreamWriter(_sessionFile, true, new UTF8Encoding(true)))
                     {
-                        if (needHeader)
-                        {
-                            sw.WriteLine("时间,工位,步号");
-                        }
                         sw.WriteLine(time.ToString("yyyy-MM-dd HH:mm:ss.fff") + "," + station + "," + step);
                     }
                 }

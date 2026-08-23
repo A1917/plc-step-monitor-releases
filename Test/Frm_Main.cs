@@ -199,10 +199,17 @@ namespace Test
             }
         }
 
-        /// <summary>记录开关：ON 时步号变化事件落盘到 records/events_日期.csv</summary>
+        /// <summary>记录开关：每次开启新建独立记录文件（events_日期_时间戳.csv）</summary>
         private void chkRecord_CheckedChanged(object sender, System.EventArgs e)
         {
-            RecordStore.Enabled = chkRecord.Checked;
+            if (chkRecord.Checked)
+            {
+                RecordStore.Start();
+            }
+            else
+            {
+                RecordStore.Stop();
+            }
         }
 
         private void Form1_Load(object sender, System.EventArgs e)
