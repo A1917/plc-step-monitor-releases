@@ -32,6 +32,8 @@ namespace Test
         private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
         private Point _mousePos = new Point(-1, -1);     // 鼠标在图表上的位置（-1 = 不在图表）
         private bool _loadingFromFile;                    // 历史加载模式（暂停实时追加）
+        private bool _draggingAnnotation;                 // 正在拖动游标/区域线
+        private float _labelBaseY = -1;                   // 标签基准 Y（拖动时更新，松开保持，-1=用顶部）
 
         private const int RefreshIntervalMs = 500;
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
@@ -85,6 +87,7 @@ namespace Test
             chart1.MouseUp += (s, e) =>
             {
                 _isPanning = false;
+                _draggingAnnotation = false;   // 松开：标签保持当前 Y（_labelBaseY 记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
             };
@@ -488,6 +491,7 @@ namespace Test
                     SyncRangeRect();
                     UpdatePageLabel();
                 }
+                _draggingAnnotation = true;   // 进入拖动状态（标签 Y 跟随鼠标）
                 return;   // 注释拖动由 Chart 默认处理
             }
             // 只在绘图区内启动拖拽平移（轴区/图例区不干扰）
@@ -522,6 +526,11 @@ namespace Test
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             _mousePos = e.Location;
+            // 拖动游标/区域线中：标签 Y 跟随鼠标（上方 34px，靠近顶部翻到下方）
+            if (_draggingAnnotation)
+            {
+                _labelBaseY = _mousePos.Y > 36 ? _mousePos.Y - 34 : _mousePos.Y + 12;
+            }
             // 游标/区域开启时实时刷新标签（跟随鼠标，拖动游标时不被遮挡）
             if ((chkCursor.Checked || chkRange.Checked) && _events.Count > 0)
             {
@@ -659,15 +668,15 @@ namespace Test
         /// <summary>分层绘制步号标签：基准 Y 跟随鼠标（避免遮挡），重叠标签自动向下错开</summary>
         private void DrawStepTags(Graphics g, ChartArea area, List<TagItem> tags)
         {
+            // 基准 Y：拖动中跟随鼠标（上方 34px）；松开后保持上一次位置；从未拖动用顶部
             double baseY;
-            if (_mousePos.Y >= 0 && _mousePos.X >= 0)
+            if (_labelBaseY >= 0)
             {
-                // 跟随鼠标：默认在鼠标上方，靠近顶部时翻到下方
-                baseY = _mousePos.Y > 26 ? _mousePos.Y - 24 : _mousePos.Y + 12;
+                baseY = _labelBaseY;
             }
             else
             {
-                baseY = area.Position.Y / 100 * chart1.Height + 2;   // 无鼠标时固定顶部
+                baseY = area.Position.Y / 100 * chart1.Height + 2;
             }
             double plotLeft = area.Position.X / 100 * chart1.Width;
 
