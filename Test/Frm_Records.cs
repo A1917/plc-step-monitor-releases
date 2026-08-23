@@ -424,12 +424,20 @@ namespace Test
             }
         }
 
-        /// <summary>滚轮缩放：X/Y 双轴锚点（鼠标在绘图区外时跳过，防 NaN）</summary>
+        /// <summary>滚轮缩放：X/Y 双轴锚点（布局未就绪或鼠标在绘图区外时跳过）</summary>
         private void OnMouseWheel(object sender, MouseEventArgs e)
         {
             var area = chart1.ChartAreas[0];
-            double mouseX = area.AxisX.PixelPositionToValue(e.X);
-            double mouseY = area.AxisY.PixelPositionToValue(e.Y);
+            double mouseX, mouseY;
+            try
+            {
+                mouseX = area.AxisX.PixelPositionToValue(e.X);
+                mouseY = area.AxisY.PixelPositionToValue(e.Y);
+            }
+            catch (InvalidOperationException)
+            {
+                return;   // 图表布局未就绪（刚打开/布局挂起期间），跳过本次缩放
+            }
             if (double.IsNaN(mouseX) || double.IsNaN(mouseY))
             {
                 return;   // 鼠标不在绘图区，跳过本次缩放
