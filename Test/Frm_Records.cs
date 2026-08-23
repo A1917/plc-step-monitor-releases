@@ -32,8 +32,10 @@ namespace Test
         private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
         private Point _mousePos = new Point(-1, -1);     // 鼠标在图表上的位置（-1 = 不在图表）
         private bool _loadingFromFile;                    // 历史加载模式（暂停实时追加）
-        private bool _draggingAnnotation;                 // 正在拖动游标/区域线
-        private float _labelBaseY = -1;                   // 标签基准 Y（拖动时更新，松开保持，-1=用顶部）
+        private int _draggingWhich = -1;                  // 拖动的线：0=游标 1=区域start 2=区域end -1=无
+        private float _cursorLabelY = -1;                 // 各线标签 Y（-1=顶部），独立记忆
+        private float _startLabelY = -1;
+        private float _endLabelY = -1;
 
         private const int MaxEvents = 60000;                // 窗体事件上限（防长时间累积卡顿）
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
@@ -87,7 +89,7 @@ namespace Test
             chart1.MouseUp += (s, e) =>
             {
                 _isPanning = false;
-                _draggingAnnotation = false;   // 松开：标签保持当前 Y（_labelBaseY 记忆）
+                _draggingWhich = -1;   // 松开：各线标签保持当前位置（独立记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
                 // 拖到最右端 → 进入跟随模式
@@ -146,7 +148,7 @@ namespace Test
             RebuildPoints();
             FitWindow();
 
-            _timer = new Timer { Interval = 33 };   // 默认 30fps（可经刷新率下拉切换）
+            _timer = new Timer { Interval = 16 };   // 默认 60fps（可经刷新率下拉切换）
             _timer.Tick += (s, e) =>
             {
                 RefreshChart();
@@ -389,14 +391,16 @@ namespace Test
             try
             {
                 var fresh = EventStore.GetSince(_station, _lastPointTime);
+                bool dataActive = PlcData.IsConnected || Simulator.IsRunning;   // 有数据源才滚动
                 if (fresh.Count == 0)
                 {
-                    // 无新事件：跟随模式窗口仍随时间平滑滚动（防"卡死"感）
-                    if (_followTail)
+                    // 无新事件：数据源活跃时窗口随时间平滑滚动（防"卡死"感）；断开/无源时冻结
+                    if (_followTail && dataActive)
                     {
                         var view = chart1.ChartAreas[0].AxisX.ScaleView;
                         DateTime tail = DateTime.Now;
                         view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                        ExtendCurrentStep();   // 曲线右端延伸当前步
                     }
                     return;
                 }
@@ -415,11 +419,12 @@ namespace Test
                         _series.Points.Clear();
                         foreach (var ev in _events) _series.Points.AddXY(ev.Time, ev.Step);
                     }
-                    if (_followTail)
+                    if (_followTail && dataActive)
                     {
                         var view = chart1.ChartAreas[0].AxisX.ScaleView;
                         DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
                         view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                        ExtendCurrentStep();   // 曲线右端延伸当前步
                     }
                 }
                 finally
@@ -434,7 +439,41 @@ namespace Test
             }
         }
 
-        /// <summary>分页移动（无数据时直接返回，防 MinValue 越界）</summary>
+        /// <summary>跟随模式：曲线右端延伸一个"当前步"虚拟点（时间=现在，步号=最后事件步号）</summary>
+        private void ExtendCurrentStep()
+        {
+            if (_events.Count == 0)
+            {
+                return;
+            }
+            // 移除旧的虚拟点（Points 最后一点时间 > 最后事件时间 即虚拟点）
+            if (_series.Points.Count > 0)
+            {
+                var last = _series.Points[_series.Points.Count - 1];
+                if (last.XValue > _lastPointTime.ToOADate())
+                {
+                    _series.Points.RemoveAt(_series.Points.Count - 1);
+                }
+            }
+            _series.Points.AddXY(DateTime.Now, _events[_events.Count - 1].Step);
+        }
+
+        /// <summary>窗口右端不超当前时间（防拖拽/缩放拖出空白）</summary>
+        private void ClampToNow()
+        {
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size))
+            {
+                return;
+            }
+            double now = DateTime.Now.ToOADate();
+            if (view.Position + view.Size > now + 0.0001)
+            {
+                view.Position = now - view.Size;
+            }
+        }
+
+        /// <summary>分页移动（◀ 止于数据起点；▶ 到最新回跟随；无数据直接返回）</summary>
         private void PageMove(int dir)
         {
             if (_events.Count == 0 || _lastPointTime == DateTime.MinValue)
@@ -442,12 +481,31 @@ namespace Test
                 return;
             }
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
-            view.Position += dir * PageSizeDays;
-            _followTail = false;
-            if (view.Position + view.Size >= _lastPointTime.ToOADate())
+            double start = _events[0].Time.ToOADate();           // 数据起点
+            double tail = Math.Max(_lastPointTime.ToOADate(), DateTime.Now.ToOADate());
+            if (dir < 0)   // 上一页（更早）
             {
-                _followTail = true;
-                view.Position = _lastPointTime.AddMilliseconds(-PageSizeMs).ToOADate();
+                double newPos = view.Position - PageSizeDays;
+                if (newPos < start)
+                {
+                    newPos = start;   // 不能翻过数据起点
+                }
+                view.Position = newPos;
+                _followTail = false;
+            }
+            else           // 下一页（更晚）
+            {
+                double newPos = view.Position + PageSizeDays;
+                if (newPos + view.Size >= tail)
+                {
+                    _followTail = true;   // 到最新 → 回跟随
+                    view.Position = tail - PageSizeDays;
+                }
+                else
+                {
+                    view.Position = newPos;
+                    _followTail = false;
+                }
             }
             SyncRangeRect();
             UpdatePageLabel();
@@ -508,6 +566,7 @@ namespace Test
             viewY.Position = mouseY - (mouseY - yPos) * fY;
             viewY.Size = newYSize;
             _followTail = false;
+            ClampToNow();   // 右端不超当前时间
         }
 
         /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标</summary>
@@ -526,7 +585,7 @@ namespace Test
                     SyncRangeRect();
                     UpdatePageLabel();
                 }
-                _draggingAnnotation = true;   // 进入拖动状态（标签 Y 跟随鼠标）
+                _draggingWhich = hit.Object == _cursor ? 0 : (hit.Object == _curStart ? 1 : 2);   // 进入拖动状态（对应线标签 Y 跟随鼠标）
                 return;   // 注释拖动由 Chart 默认处理
             }
             // 只在绘图区内启动拖拽平移（轴区/图例区不干扰）
@@ -561,10 +620,13 @@ namespace Test
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             _mousePos = e.Location;
-            // 拖动游标/区域线中：标签 Y 跟随鼠标（上方 34px，靠近顶部翻到下方）
-            if (_draggingAnnotation)
+            // 拖动中：只有被拖动的线标签跟随鼠标（上方 68px，靠近顶部翻到下方）
+            if (_draggingWhich >= 0)
             {
-                _labelBaseY = _mousePos.Y > 36 ? _mousePos.Y - 34 : _mousePos.Y + 12;
+                float y = _mousePos.Y > 70 ? _mousePos.Y - 68 : _mousePos.Y + 12;
+                if (_draggingWhich == 0) _cursorLabelY = y;
+                else if (_draggingWhich == 1) _startLabelY = y;
+                else if (_draggingWhich == 2) _endLabelY = y;
             }
             // 游标/区域开启时实时刷新标签（跟随鼠标，拖动游标时不被遮挡）
             if ((chkCursor.Checked || chkRange.Checked) && _events.Count > 0)
@@ -580,6 +642,7 @@ namespace Test
                 area.AxisY.ScaleView.Position = _panYViewStart + dy;
                 area.AxisY.ScaleView.Size = _panYSizeStart;
                 _followTail = false;
+                ClampToNow();   // 右端不超当前时间（防拖出空白）
                 SyncRangeRect();
                 UpdatePageLabel();
                 return;
@@ -657,17 +720,17 @@ namespace Test
                 var tags = new List<TagItem>();
                 if (chkCursor.Checked && !double.IsNaN(_cursor.X))
                 {
-                    tags.Add(new TagItem(_cursor.X, StepText(_cursor.X), Color.Orange));
+                    tags.Add(new TagItem(_cursor.X, StepText(_cursor.X), Color.Orange, _cursorLabelY));
                 }
                 if (chkRange.Checked)
                 {
                     if (!double.IsNaN(_curStart.X))
                     {
-                        tags.Add(new TagItem(_curStart.X, StepText(_curStart.X), Color.DeepSkyBlue));
+                        tags.Add(new TagItem(_curStart.X, StepText(_curStart.X), Color.DeepSkyBlue, _startLabelY));
                     }
                     if (!double.IsNaN(_curEnd.X))
                     {
-                        tags.Add(new TagItem(_curEnd.X, StepText(_curEnd.X), Color.DeepSkyBlue));
+                        tags.Add(new TagItem(_curEnd.X, StepText(_curEnd.X), Color.DeepSkyBlue, _endLabelY));
                     }
                     DrawRangeDuration(e.Graphics, area);   // 区域时长画在图表内
                 }
@@ -691,7 +754,9 @@ namespace Test
             public double X;
             public string Text;
             public Color Color;
-            public TagItem(double x, string text, Color color) { X = x; Text = text; Color = color; }
+            public float BaseY;   // 该线标签的基准 Y（-1 = 顶部）
+            public TagItem(double x, string text, Color color, float baseY)
+            { X = x; Text = text; Color = color; BaseY = baseY; }
         }
 
         private string StepText(double xOADate)
@@ -700,22 +765,13 @@ namespace Test
             return step < 0 ? "步号 --" : "步号 " + step;
         }
 
-        /// <summary>分层绘制步号标签：基准 Y 跟随鼠标（避免遮挡），重叠标签自动向下错开</summary>
+        /// <summary>分层绘制步号标签：每根线独立基准 Y（拖动时跟随鼠标），重叠自动向下错开</summary>
         private void DrawStepTags(Graphics g, ChartArea area, List<TagItem> tags)
         {
-            // 基准 Y：拖动中跟随鼠标（上方 34px）；松开后保持上一次位置；从未拖动用顶部
-            double baseY;
-            if (_labelBaseY >= 0)
-            {
-                baseY = _labelBaseY;
-            }
-            else
-            {
-                baseY = area.Position.Y / 100 * chart1.Height + 2;
-            }
+            float topBase = (float)(area.Position.Y / 100 * chart1.Height + 2);   // 顶部基准
             double plotLeft = area.Position.X / 100 * chart1.Width;
 
-            // 计算每个标签像素范围
+            // 计算每个标签像素范围（BaseY = -1 用顶部）
             var items = new List<TagLayout>();
             foreach (var t in tags)
             {
@@ -723,29 +779,31 @@ namespace Test
                 SizeF sz = g.MeasureString(t.Text, _labelFont);
                 float l = xPix - sz.Width / 2 - 4;
                 if (l < plotLeft) l = (float)plotLeft;
-                items.Add(new TagLayout(l, l + sz.Width + 8, t.Text, t.Color));
+                float baseY = t.BaseY >= 0 ? t.BaseY : topBase;
+                items.Add(new TagLayout(l, l + sz.Width + 8, t.Text, t.Color, baseY));
             }
             items.Sort((a, b) => a.Left.CompareTo(b.Left));
 
-            // 贪心分层：每层记录最右边界，重叠则放下层（自动调整 Y）
-            var layers = new List<float>();
+            // 分层：按 x 重叠判断，从各自基准 Y 向下错开（每层 24px）
+            var placed = new List<TagLayout>();
             foreach (var it in items)
             {
-                int li = 0;
-                for (; li < layers.Count; li++)
+                int layer = 0;
+                foreach (var p in placed)
                 {
-                    if (it.Left > layers[li] + 4) break;   // 4px 间隔
+                    if (it.Left <= p.Right + 4 && it.Right >= p.Left - 4)
+                    {
+                        layer = Math.Max(layer, p.Layer + 1);
+                    }
                 }
-                if (li == layers.Count) layers.Add(it.Right);
-                else layers[li] = it.Right;
-
-                float y = (float)baseY + li * 24;
+                float y = it.BaseY + layer * 24;
                 using (var bg = new SolidBrush(it.Color))
                 {
                     var rect = new RectangleF(it.Left, y, it.Right - it.Left, 20);
                     g.FillRectangle(bg, rect);
                     g.DrawString(it.Text, _labelFont, Brushes.White, it.Left + 4, y + 2);
                 }
+                placed.Add(new TagLayout(it.Left, it.Right, it.Text, it.Color, it.BaseY, layer));
             }
         }
 
@@ -755,8 +813,10 @@ namespace Test
             public float Right;
             public string Text;
             public Color Color;
-            public TagLayout(float left, float right, string text, Color color)
-            { Left = left; Right = right; Text = text; Color = color; }
+            public float BaseY;
+            public int Layer;
+            public TagLayout(float left, float right, string text, Color color, float baseY, int layer = 0)
+            { Left = left; Right = right; Text = text; Color = color; BaseY = baseY; Layer = layer; }
         }
 
         /// <summary>区域时长文本画在区域中间（顶部标签行下方），单位 ms</summary>

@@ -157,7 +157,7 @@ namespace Test
             this.cmbRefresh.Name = "cmbRefresh";
             this.cmbRefresh.Size = new System.Drawing.Size(90, 23);
             this.cmbRefresh.TabIndex = 10;
-            this.cmbRefresh.SelectedIndex = 1;   // 默认 30fps
+            this.cmbRefresh.SelectedIndex = 0;   // 默认 60fps（全局）
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 485);
