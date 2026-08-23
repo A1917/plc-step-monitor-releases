@@ -35,7 +35,6 @@ namespace Test
         private bool _draggingAnnotation;                 // 正在拖动游标/区域线
         private float _labelBaseY = -1;                   // 标签基准 Y（拖动时更新，松开保持，-1=用顶部）
 
-        private const int RefreshIntervalMs = 100;          // 100ms 刷新（丝滑）
         private const int MaxEvents = 60000;                // 窗体事件上限（防长时间累积卡顿）
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
         private double PageSizeMs => (double)nudPageSec.Value * 1000;
@@ -147,13 +146,20 @@ namespace Test
             RebuildPoints();
             FitWindow();
 
-            _timer = new Timer { Interval = RefreshIntervalMs };
+            _timer = new Timer { Interval = 33 };   // 默认 30fps（可经刷新率下拉切换）
             _timer.Tick += (s, e) =>
             {
                 RefreshChart();
                 // 游标信息已含区域信息；区域仅在未开游标时单独显示（防覆盖）
                 if (chkCursor.Checked) UpdateCursorInfo();
                 else if (chkRange.Checked) UpdateRangeInfo();
+            };
+            // 刷新率切换：60fps/30fps/10fps → 16/33/100ms
+            cmbRefresh.SelectedIndexChanged += (s, e) =>
+            {
+                int[] intervals = { 16, 33, 100 };
+                int idx = Math.Max(0, cmbRefresh.SelectedIndex);
+                _timer.Interval = intervals[Math.Min(idx, intervals.Length - 1)];
             };
             _timer.Start();
             FormClosing += (s, e) => _timer.Stop();

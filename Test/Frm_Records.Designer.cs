@@ -20,6 +20,7 @@ namespace Test
         private NumericUpDown nudPageSec;
         private Button btnFit;
         private Button btnLoad;
+        private ComboBox cmbRefresh;
 
         protected override void Dispose(bool disposing)
         {
@@ -45,6 +46,7 @@ namespace Test
             this.nudPageSec = new System.Windows.Forms.NumericUpDown();
             this.btnFit = new System.Windows.Forms.Button();
             this.btnLoad = new System.Windows.Forms.Button();
+            this.cmbRefresh = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
@@ -61,6 +63,7 @@ namespace Test
             this.chart1.Size = new System.Drawing.Size(800, 450);
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
+            this.panelBottom.Controls.Add(this.cmbRefresh);
             this.panelBottom.Controls.Add(this.btnLoad);
             this.panelBottom.Controls.Add(this.btnFit);
             this.panelBottom.Controls.Add(this.nudPageSec);
@@ -147,6 +150,14 @@ namespace Test
             this.btnLoad.TabIndex = 9;
             this.btnLoad.Text = "加载";
             this.btnLoad.UseVisualStyleBackColor = true;
+            this.cmbRefresh.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbRefresh.FormattingEnabled = true;
+            this.cmbRefresh.Items.AddRange(new object[] { "60fps", "30fps", "10fps" });
+            this.cmbRefresh.Location = new System.Drawing.Point(690, 7);
+            this.cmbRefresh.Name = "cmbRefresh";
+            this.cmbRefresh.Size = new System.Drawing.Size(90, 23);
+            this.cmbRefresh.TabIndex = 10;
+            this.cmbRefresh.SelectedIndex = 1;   // 默认 30fps
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 485);
