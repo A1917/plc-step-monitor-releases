@@ -11,6 +11,9 @@ namespace Test
         private CheckedListBox chkStations;
         private Chart chart1;
         private Label lblInfo;
+        private Button btnFit;
+        private Button btnSelectAll;
+        private Panel panelBottom;
 
         protected override void Dispose(bool disposing)
         {
@@ -25,8 +28,12 @@ namespace Test
             this.panelLeft = new Panel();
             this.chkStations = new CheckedListBox();
             this.lblInfo = new Label();
-            ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
+            this.btnFit = new Button();
+            this.btnSelectAll = new Button();
+            this.panelBottom = new Panel();
             this.panelLeft.SuspendLayout();
+            this.panelBottom.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.SuspendLayout();
 
             // panelLeft
@@ -43,40 +50,65 @@ namespace Test
             this.chkStations.FormattingEnabled = true;
             this.chkStations.Location = new System.Drawing.Point(0, 0);
             this.chkStations.Name = "chkStations";
-            this.chkStations.Size = new System.Drawing.Size(160, 524);
+            this.chkStations.Size = new System.Drawing.Size(160, 514);
             this.chkStations.TabIndex = 0;
 
+            // panelBottom
+            this.panelBottom.Controls.Add(this.btnSelectAll);
+            this.panelBottom.Controls.Add(this.btnFit);
+            this.panelBottom.Controls.Add(this.lblInfo);
+            this.panelBottom.Dock = DockStyle.Bottom;
+            this.panelBottom.Location = new System.Drawing.Point(0, 550);
+            this.panelBottom.Name = "panelBottom";
+            this.panelBottom.Size = new System.Drawing.Size(960, 36);
+            this.panelBottom.TabIndex = 1;
+
+            // btnSelectAll
+            this.btnSelectAll.Location = new System.Drawing.Point(8, 6);
+            this.btnSelectAll.Name = "btnSelectAll";
+            this.btnSelectAll.Size = new System.Drawing.Size(80, 25);
+            this.btnSelectAll.TabIndex = 0;
+            this.btnSelectAll.Text = "全选/全不选";
+
+            // btnFit
+            this.btnFit.Location = new System.Drawing.Point(96, 6);
+            this.btnFit.Name = "btnFit";
+            this.btnFit.Size = new System.Drawing.Size(60, 25);
+            this.btnFit.TabIndex = 1;
+            this.btnFit.Text = "适应";
+
+            // lblInfo
+            this.lblInfo.Anchor = ((AnchorStyles)((((AnchorStyles.Top | AnchorStyles.Bottom) | AnchorStyles.Left) | AnchorStyles.Right)));
+            this.lblInfo.BorderStyle = BorderStyle.FixedSingle;
+            this.lblInfo.Location = new System.Drawing.Point(165, 8);
+            this.lblInfo.Name = "lblInfo";
+            this.lblInfo.Size = new System.Drawing.Size(780, 24);
+            this.lblInfo.TabIndex = 2;
+            this.lblInfo.Text = "游标";
+
             // chart1
-            this.chart1.Anchor = ((AnchorStyles)((((AnchorStyles.Top | AnchorStyles.Bottom) | AnchorStyles.Left) | AnchorStyles.Right)));
+            this.chart1.Dock = DockStyle.Fill;
             this.chart1.Location = new System.Drawing.Point(160, 0);
             this.chart1.Name = "chart1";
-            this.chart1.Size = new System.Drawing.Size(640, 524);
-            this.chart1.TabIndex = 1;
+            this.chart1.Size = new System.Drawing.Size(800, 550);
+            this.chart1.TabIndex = 2;
             this.chart1.Text = "chart1";
             ChartArea ca = new ChartArea();
             this.chart1.ChartAreas.Add(ca);
             Legend leg = new Legend();
             this.chart1.Legends.Add(leg);
 
-            // lblInfo
-            this.lblInfo.BorderStyle = BorderStyle.FixedSingle;
-            this.lblInfo.Dock = DockStyle.Bottom;
-            this.lblInfo.Location = new System.Drawing.Point(0, 524);
-            this.lblInfo.Name = "lblInfo";
-            this.lblInfo.Size = new System.Drawing.Size(800, 22);
-            this.lblInfo.TabIndex = 2;
-            this.lblInfo.Text = "勾选左侧工位查看趋势";
-
             // Frm_MultiTrend
             this.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 546);
+            this.ClientSize = new System.Drawing.Size(960, 586);
             this.Controls.Add(this.chart1);
             this.Controls.Add(this.panelLeft);
-            this.Controls.Add(this.lblInfo);
+            this.Controls.Add(this.panelBottom);
             this.Name = "Frm_MultiTrend";
             this.Text = "多工位趋势图";
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).EndInit();
+            this.panelBottom.ResumeLayout(false);
             this.panelLeft.ResumeLayout(false);
             this.ResumeLayout(false);
         }

@@ -464,7 +464,7 @@ namespace Test
             _series.Points.AddXY(DateTime.Now, _events[_events.Count - 1].Step);
         }
 
-        /// <summary>窗口右端不超当前时间（防拖拽/缩放拖出空白）</summary>
+        /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白）</summary>
         private void ClampToNow()
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
@@ -476,6 +476,14 @@ namespace Test
             if (view.Position + view.Size > now + 0.0001)
             {
                 view.Position = now - view.Size;
+            }
+            if (_events.Count > 0)
+            {
+                double dataStart = _events[0].Time.ToOADate();
+                if (view.Position < dataStart - 0.0001)
+                {
+                    view.Position = dataStart;   // 左侧不能滑出无数据区域
+                }
             }
         }
 
