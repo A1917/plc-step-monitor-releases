@@ -505,6 +505,26 @@ namespace Test
             }
         }
 
+        /// <summary>Y 轴视口不拖出数据范围（防曲线消失在视野外）</summary>
+        private void ClampYAxis()
+        {
+            if (_events.Count == 0) return;
+            var view = chart1.ChartAreas[0].AxisY.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            short minY = short.MaxValue, maxY = short.MinValue;
+            foreach (var ev in _events)
+            {
+                if (ev.Step < minY) minY = ev.Step;
+                if (ev.Step > maxY) maxY = ev.Step;
+            }
+            if (minY == short.MaxValue) return;
+            double span = Math.Max(maxY - minY, 1);
+            double lo = minY - span * 0.2;   // 允许 20% 越界查看
+            double hi = maxY + span * 0.2;
+            if (view.Position < lo) view.Position = lo;
+            if (view.Position + view.Size > hi) view.Position = hi - view.Size;
+        }
+
         /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白）</summary>
         private void ClampToNow()
         {
@@ -698,6 +718,7 @@ namespace Test
                 area.AxisY.ScaleView.Size = _panYSizeStart;
                 _followTail = false;
                 ClampToNow();   // 右端不超当前时间（防拖出空白）
+                ClampYAxis();   // Y 轴不拖出数据范围（防曲线消失）
                 SyncRangeRect();
                 UpdatePageLabel();
                 return;

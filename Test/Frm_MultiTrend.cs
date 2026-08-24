@@ -13,6 +13,9 @@ namespace Test
         private readonly Dictionary<int, List<StepEvent>> _byStation;   // 每工位时间有序事件
         private readonly Timer _timer;
         private VerticalLineAnnotation _cursor;
+        private VerticalLineAnnotation _curStart, _curEnd;   // 区域开始/结束
+        private RectangleAnnotation _rangeRect;              // 区域高亮
+        private double _lastRangeStart, _lastRangeEnd;       // 锁定联动基线
         private bool _isPanning;
         private Point _panStart;
         private double _panViewStart, _panYViewStart, _panYSizeStart;
@@ -29,7 +32,11 @@ namespace Test
             RebuildSeries();
             Text = "多工位趋势图（点击图例高亮，双击改色）";
             _timer = new Timer { Interval = 100 };
-            _timer.Tick += (s, e) => { };
+            _timer.Tick += (s, e) =>
+            {
+                UpdateCursorInfo();
+                UpdateRangeInfo();
+            };
             _timer.Start();
             FormClosing += (s, e) => _timer.Stop();
         }
@@ -79,13 +86,54 @@ namespace Test
             };
             chart1.Annotations.Add(_cursor);
 
+            // 区域游标（开始/结束线 + 高亮）
+            _curStart = new VerticalLineAnnotation
+            {
+                AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
+                AllowMoving = true, AllowSelecting = false,
+                LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false
+            };
+            _curEnd = new VerticalLineAnnotation
+            {
+                AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
+                AllowMoving = true, AllowSelecting = false,
+                LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false
+            };
+            _rangeRect = new RectangleAnnotation
+            {
+                AxisX = area.AxisX, AxisY = area.AxisY,
+                AllowMoving = false, AllowResizing = false, LineWidth = 0,
+                BackColor = Color.FromArgb(70, 25, 25, 112), Visible = false
+            };
+            chart1.Annotations.Add(_curStart);
+            chart1.Annotations.Add(_curEnd);
+            chart1.Annotations.Add(_rangeRect);
+
             chart1.MouseWheel += OnMouseWheel;
             chart1.MouseDown += OnChartMouseDown;
             chart1.MouseMove += OnChartMouseMove;
             chart1.MouseUp += (s, e) =>
             {
                 _isPanning = false;
+                _lastRangeStart = _curStart.X;
+                _lastRangeEnd = _curEnd.X;
                 UpdateCursorInfo();
+                UpdateRangeInfo();
+            };
+
+            // 区域开关
+            chkRange.CheckedChanged += (s, e) =>
+            {
+                _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked;
+                if (chkRange.Checked)
+                {
+                    PlaceRangeInView();
+                }
+            };
+            chkLock.CheckedChanged += (s, e) =>
+            {
+                _lastRangeStart = _curStart.X;
+                _lastRangeEnd = _curEnd.X;
             };
 
             // 点击图例高亮对应工位折线
@@ -202,7 +250,54 @@ namespace Test
             // 游标置于视野中间
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             _cursor.X = view.Position + view.Size / 2;
+            PlaceRangeInView();
             UpdateCursorInfo();
+            UpdateRangeInfo();
+        }
+
+        /// <summary>区域线置于视野中间两侧（间隔 30%）</summary>
+        private void PlaceRangeInView()
+        {
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            double center = view.Position + view.Size / 2;
+            _curStart.X = center - view.Size * 0.15;
+            _curEnd.X = center + view.Size * 0.15;
+            _lastRangeStart = _curStart.X;
+            _lastRangeEnd = _curEnd.X;
+            SyncRangeRect();
+        }
+
+        /// <summary>区域高亮矩形覆盖绘图区 + 时长显示</summary>
+        private void SyncRangeRect()
+        {
+            if (double.IsNaN(_curStart.X) || double.IsNaN(_curEnd.X)) return;
+            var area = chart1.ChartAreas[0];
+            var viewY = area.AxisY.ScaleView;
+            double yMin = viewY.Position;
+            double yMax = viewY.Position + viewY.Size;
+            if (double.IsNaN(yMin) || double.IsInfinity(yMin)) yMin = area.AxisY.Minimum;
+            if (double.IsNaN(yMax) || double.IsInfinity(yMax)) yMax = area.AxisY.Maximum;
+            if (double.IsNaN(yMin) || double.IsInfinity(yMin)) yMin = 0;
+            if (double.IsNaN(yMax) || double.IsInfinity(yMax)) yMax = 100;
+            double x1 = Math.Min(_curStart.X, _curEnd.X);
+            double x2 = Math.Max(_curStart.X, _curEnd.X);
+            _rangeRect.X = x1;
+            _rangeRect.Width = x2 - x1;
+            _rangeRect.Y = yMin;
+            _rangeRect.Height = Math.Max(yMax - yMin, 1);
+        }
+
+        /// <summary>区域信息：时长（ms 单位）</summary>
+        private void UpdateRangeInfo()
+        {
+            if (!chkRange.Checked) return;
+            SyncRangeRect();
+            double x1 = Math.Min(_curStart.X, _curEnd.X);
+            double x2 = Math.Max(_curStart.X, _curEnd.X);
+            double durMs = (x2 - x1) * 86400000.0;
+            lblInfo.Text = "区域 " + DateTime.FromOADate(x1).ToString("HH:mm:ss.fff")
+                           + " ~ " + DateTime.FromOADate(x2).ToString("HH:mm:ss.fff")
+                           + "  时长 " + durMs.ToString("F0") + " ms";
         }
 
         /// <summary>适应：X/Y 轴覆盖全部选中数据（含 10% 留白）</summary>
@@ -292,6 +387,23 @@ namespace Test
 
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
+            // 锁定区域：拖动一根线时另一根同步（保持区域长度，整体平移）
+            if (chkLock.Checked && chkRange.Checked)
+            {
+                double dStart = _curStart.X - _lastRangeStart;
+                double dEnd = _curEnd.X - _lastRangeEnd;
+                if (Math.Abs(dStart) > 1e-12 && Math.Abs(dEnd) < Math.Abs(dStart) * 0.1)
+                {
+                    _curEnd.X += dStart;
+                }
+                else if (Math.Abs(dEnd) > 1e-12 && Math.Abs(dStart) < Math.Abs(dEnd) * 0.1)
+                {
+                    _curStart.X += dEnd;
+                }
+                _lastRangeStart = _curStart.X;
+                _lastRangeEnd = _curEnd.X;
+                SyncRangeRect();
+            }
             if (!_isPanning) return;
             var area = chart1.ChartAreas[0];
             double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;

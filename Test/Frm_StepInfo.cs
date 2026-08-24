@@ -158,15 +158,11 @@ namespace Test
             catch (InvalidOperationException) { }
         }
 
-        /// <summary>双击工位格子：打开该工位实时趋势图（非模态 MDI 子窗体）</summary>
+        /// <summary>双击工位格子：打开该工位实时趋势图（独立窗口，可自由排列/最大化）</summary>
         private void OpenTrend(int station)
         {
             var frm = new Frm_Records(station);
-            if (this.MdiParent != null)
-            {
-                frm.MdiParent = this.MdiParent;
-            }
-            frm.Show();
+            frm.Show();   // 独立窗口（非 MDI，避免最大化/关闭影响主窗体布局）
         }
 
         private void Frm_StepInfo_Load(object sender, EventArgs e)

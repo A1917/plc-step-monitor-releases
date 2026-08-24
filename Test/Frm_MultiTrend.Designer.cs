@@ -14,6 +14,8 @@ namespace Test
         private Button btnFit;
         private Button btnSelectAll;
         private Panel panelBottom;
+        private CheckBox chkRange;
+        private CheckBox chkLock;
 
         protected override void Dispose(bool disposing)
         {
@@ -31,6 +33,8 @@ namespace Test
             this.btnFit = new Button();
             this.btnSelectAll = new Button();
             this.panelBottom = new Panel();
+            this.chkRange = new CheckBox();
+            this.chkLock = new CheckBox();
             this.panelLeft.SuspendLayout();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
@@ -54,6 +58,8 @@ namespace Test
             this.chkStations.TabIndex = 0;
 
             // panelBottom
+            this.panelBottom.Controls.Add(this.chkLock);
+            this.panelBottom.Controls.Add(this.chkRange);
             this.panelBottom.Controls.Add(this.btnSelectAll);
             this.panelBottom.Controls.Add(this.btnFit);
             this.panelBottom.Controls.Add(this.lblInfo);
@@ -76,6 +82,22 @@ namespace Test
             this.btnFit.Size = new System.Drawing.Size(60, 25);
             this.btnFit.TabIndex = 1;
             this.btnFit.Text = "适应";
+
+            // chkRange
+            this.chkRange.AutoSize = true;
+            this.chkRange.Location = new System.Drawing.Point(300, 10);
+            this.chkRange.Name = "chkRange";
+            this.chkRange.Size = new System.Drawing.Size(60, 19);
+            this.chkRange.TabIndex = 2;
+            this.chkRange.Text = "区域";
+
+            // chkLock
+            this.chkLock.AutoSize = true;
+            this.chkLock.Location = new System.Drawing.Point(368, 10);
+            this.chkLock.Name = "chkLock";
+            this.chkLock.Size = new System.Drawing.Size(60, 19);
+            this.chkLock.TabIndex = 3;
+            this.chkLock.Text = "锁定";
 
             // lblInfo
             this.lblInfo.Anchor = ((AnchorStyles)((((AnchorStyles.Top | AnchorStyles.Bottom) | AnchorStyles.Left) | AnchorStyles.Right)));
