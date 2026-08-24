@@ -212,6 +212,38 @@ namespace Test
             }
         }
 
+        /// <summary>加载历史记录到全局缓存（所有工位趋势图自动使用）</summary>
+        private void btnLoadHistory_Click(object sender, System.EventArgs e)
+        {
+            using (var dlg = new System.Windows.Forms.OpenFileDialog())
+            {
+                dlg.Title = "加载历史记录";
+                dlg.Filter = "CSV 记录 (*.csv)|*.csv";
+                dlg.InitialDirectory = RecordStore.RecordsDir;
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                {
+                    return;
+                }
+                var data = RecordStore.Load(dlg.FileName);
+                if (data.Count == 0)
+                {
+                    System.Windows.Forms.MessageBox.Show("文件无有效数据");
+                    return;
+                }
+                EventStore.LoadedHistory = data;
+                System.Windows.Forms.MessageBox.Show("已加载 " + data.Count + " 条事件记录\n双击工位格子查看历史趋势图");
+            }
+        }
+
+        /// <summary>打开多工位总览趋势图</summary>
+        private void btnMultiTrend_Click(object sender, System.EventArgs e)
+        {
+            using (var frm = new Frm_MultiTrend())
+            {
+                frm.ShowDialog(this);
+            }
+        }
+
         private void Form1_Load(object sender, System.EventArgs e)
         {
             FormClosing += Form1_FormClosing;

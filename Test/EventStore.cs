@@ -33,9 +33,12 @@ namespace Test
         private static readonly bool[] _initialized = new bool[PlcData.StepCount];
         private static readonly object _lock = new object();
 
+        /// <summary>通过主界面「加载」按钮载入的历史记录（全局共享，趋势图自动使用）</summary>
+        public static List<StepEvent> LoadedHistory;
+
         /// <summary>
         /// 轮询线程调用：喂入步值快照，与上次对比，变化则生成事件（时间戳=采样时刻）。
-        /// 首次出现的工位只建立基线，不生成事件（避免启动瞬间的假变化）。
+        /// 首次出现的工位也生成一个基线事件（趋势图无变化时也能显示当前步）。
         /// </summary>
         public static void Feed(short[] steps)
         {
@@ -49,7 +52,8 @@ namespace Test
                     {
                         _lastStep[i] = v;
                         _initialized[i] = true;
-                        continue;   // 首次：只建基线
+                        AddEvent(i, v);   // 首值也生成事件（显示当前步）
+                        continue;
                     }
                     if (v != _lastStep[i])
                     {
@@ -75,6 +79,7 @@ namespace Test
                 {
                     _lastStep[station] = step;
                     _initialized[station] = true;
+                    AddEvent(station, step);   // 首值也生成事件（显示当前步）
                     return;
                 }
                 if (step != _lastStep[station])

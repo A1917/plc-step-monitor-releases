@@ -18,6 +18,8 @@ namespace Test
         private TextBox txtPlcIp;
         private CheckBox chkSimulate;
         private CheckBox chkRecord;
+        private Button btnLoadHistory;
+        private Button btnMultiTrend;
 
         protected override void Dispose(bool disposing)
         {
@@ -43,6 +45,8 @@ namespace Test
             this.txtPlcIp = new System.Windows.Forms.TextBox();
             this.chkSimulate = new System.Windows.Forms.CheckBox();
             this.chkRecord = new System.Windows.Forms.CheckBox();
+            this.btnLoadHistory = new System.Windows.Forms.Button();
+            this.btnMultiTrend = new System.Windows.Forms.Button();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -71,6 +75,8 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.btnMultiTrend);
+            this.panel1.Controls.Add(this.btnLoadHistory);
             this.panel1.Controls.Add(this.chkRecord);
             this.panel1.Controls.Add(this.chkSimulate);
             this.panel1.Controls.Add(this.txtPlcIp);
@@ -133,6 +139,20 @@ namespace Test
             this.chkRecord.Text = "记录";
             this.chkRecord.UseVisualStyleBackColor = true;
             this.chkRecord.CheckedChanged += new System.EventHandler(chkRecord_CheckedChanged);
+            this.btnLoadHistory.Location = new System.Drawing.Point(390, 21);
+            this.btnLoadHistory.Name = "btnLoadHistory";
+            this.btnLoadHistory.Size = new System.Drawing.Size(60, 25);
+            this.btnLoadHistory.TabIndex = 12;
+            this.btnLoadHistory.Text = "加载";
+            this.btnLoadHistory.UseVisualStyleBackColor = true;
+            this.btnLoadHistory.Click += new System.EventHandler(btnLoadHistory_Click);
+            this.btnMultiTrend.Location = new System.Drawing.Point(460, 21);
+            this.btnMultiTrend.Name = "btnMultiTrend";
+            this.btnMultiTrend.Size = new System.Drawing.Size(80, 25);
+            this.btnMultiTrend.TabIndex = 13;
+            this.btnMultiTrend.Text = "总览趋势";
+            this.btnMultiTrend.UseVisualStyleBackColor = true;
+            this.btnMultiTrend.Click += new System.EventHandler(btnMultiTrend_Click);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);

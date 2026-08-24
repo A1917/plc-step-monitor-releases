@@ -146,7 +146,42 @@ namespace Test
             };
 
             RebuildPoints();
-            FitWindow();
+            if (EventStore.LoadedHistory != null)
+            {
+                // 全局历史已加载：自动进入历史模式
+                var fileEvents = EventStore.LoadedHistory.FindAll(ev => ev.Station == _station);
+                if (fileEvents.Count > 0)
+                {
+                    _events.Clear();
+                    _events.AddRange(fileEvents);
+                    _lastPointTime = _events[_events.Count - 1].Time;
+                    _loadingFromFile = true;
+                    RebuildPoints();
+                    // 手动适应显示历史数据
+                    var chartArea = chart1.ChartAreas[0];
+                    double start = _events[0].Time.ToOADate();
+                    double end = _events[_events.Count - 1].Time.ToOADate();
+                    chartArea.AxisX.ScaleView.Position = start;
+                    chartArea.AxisX.ScaleView.Size = Math.Max(end - start, 0.5 / 86400000.0);
+                    short minY = short.MaxValue, maxY = short.MinValue;
+                    foreach (var ev in _events) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
+                    double ySpan = Math.Max(maxY - minY, 1);
+                    chartArea.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                    chartArea.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                    _followTail = false;
+                    UpdatePageLabel();
+                    SyncRangeRect();
+                    Text = "工位 " + _station + " 历史记录（双击回实时）";
+                }
+                else
+                {
+                    FitWindow();
+                }
+            }
+            else
+            {
+                FitWindow();   // 实时模式
+            }
 
             _timer = new Timer { Interval = 16 };   // 默认 60fps（可经刷新率下拉切换）
             _timer.Tick += (s, e) =>
@@ -275,7 +310,7 @@ namespace Test
             chart1.Invalidate();
         }
 
-        /// <summary>适应当前页：X/Y 轴四周预留空间（上下 10% 步数留白，左右数据范围留白）</summary>
+        /// <summary>适应当前页：X 轴四周预留空间；Y 轴以历史（内存全部数据）最大范围缩放</summary>
         private void FitToData()
         {
             var area = chart1.ChartAreas[0];
@@ -284,43 +319,14 @@ namespace Test
             {
                 return;
             }
-            // 当前窗口内数据时间范围与步号范围
-            DateTime t0 = SafeFromOADate(view.Position);
-            DateTime t1 = SafeFromOADate(view.Position + view.Size);
+            // Y 轴：内存全部数据的最小~最大步号（历史最大范围，不被刚刷新的小步号压扁）
             short minY = short.MaxValue, maxY = short.MinValue;
-            DateTime d0 = DateTime.MaxValue, d1 = DateTime.MinValue;
-            bool found = false;
             foreach (var ev in _events)
             {
-                if (ev.Time < t0) continue;
-                if (ev.Time >= t1) break;
-                found = true;
                 if (ev.Step < minY) minY = ev.Step;
                 if (ev.Step > maxY) maxY = ev.Step;
-                if (ev.Time < d0) d0 = ev.Time;
-                if (ev.Time > d1) d1 = ev.Time;
             }
-
-            // X 轴：窗口 = 数据范围 + 左右 10% 留白（上限每页时长），数据居中
-            if (found)
-            {
-                double dataSpan = (d1 - d0).TotalDays;
-                double padX = dataSpan * 0.1;
-                double ideal = dataSpan + padX * 2;
-                if (ideal <= PageSizeDays)
-                {
-                    view.Size = Math.Max(ideal, 0.5 / 86400000.0);
-                    view.Position = d0.ToOADate() - padX;
-                }
-                else
-                {
-                    view.Size = PageSizeDays;
-                    view.Position = d1.ToOADate() - PageSizeDays;
-                }
-            }
-
-            // Y 轴：min~max 上下各 10% 留白（1000 步时顶部显示 ~1100）
-            if (!found)
+            if (minY == short.MaxValue)
             {
                 minY = 0; maxY = 1;
             }
@@ -328,7 +334,7 @@ namespace Test
             double padY = ySpan * 0.1;
             area.AxisY.ScaleView.Position = minY - padY;
             area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
-            _followTail = true;   // 适应后进入跟随模式
+            // 注意：不进入跟随模式、不移动 X 轴——适应只缩放当前页（保持当前位置）
             SyncRangeRect();
             UpdatePageLabel();
         }
