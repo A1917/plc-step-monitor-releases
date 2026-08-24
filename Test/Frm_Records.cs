@@ -92,13 +92,12 @@ namespace Test
                 _draggingWhich = -1;   // 松开：各线标签保持当前位置（独立记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
-                // 拖到最右端 → 进入跟随模式
+                // 拖到最右端 → 进入跟随模式（数据活跃贴当前时间，不活跃贴数据末尾，防视图跳空）
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
                 if (_events.Count > 0 && view.Position + view.Size >= _lastPointTime.ToOADate())
                 {
                     _followTail = true;
-                    DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
-                    view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                    view.Position = ViewTailOADate() - PageSizeDays;
                 }
             };
             chart1.MouseLeave += (s, e) =>
@@ -166,7 +165,7 @@ namespace Test
                     short minY = short.MaxValue, maxY = short.MinValue;
                     foreach (var ev in _events) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
                     double ySpan = Math.Max(maxY - minY, 1);
-                    chartArea.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                    chartArea.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(ySpan * 0.1, 2));
                     chartArea.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
                     _followTail = false;
                     UpdatePageLabel();
@@ -332,8 +331,9 @@ namespace Test
             }
             double ySpan = Math.Max(maxY - minY, 1);
             double padY = ySpan * 0.1;
-            area.AxisY.ScaleView.Position = minY - padY;
-            area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
+            // 上方留 10% 看全；下方最多 2 步留白且不显示负值区（防下方大面积留空）
+            area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(padY, 2));
+            area.AxisY.ScaleView.Size = ySpan + padY + Math.Min(padY, 2) + 1;
             // 注意：不进入跟随模式、不移动 X 轴——适应只缩放当前页（保持当前位置）
             SyncRangeRect();
             UpdatePageLabel();
@@ -377,7 +377,7 @@ namespace Test
                     if (ev.Step > maxY) maxY = ev.Step;
                 }
                 double ySpan = Math.Max(maxY - minY, 1);
-                area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(ySpan * 0.1, 2));
                 area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
                 _followTail = false;
                 UpdatePageLabel();
@@ -519,7 +519,8 @@ namespace Test
             }
             if (minY == short.MaxValue) return;
             double span = Math.Max(maxY - minY, 1);
-            double lo = minY - span * 0.2;   // 允许 20% 越界查看
+            // 下方最多 2 步越界且不显示负值区（防拖拽后下方留空）
+            double lo = Math.Max(0, minY - Math.Min(span * 0.2, 2));
             double hi = maxY + span * 0.2;
             if (view.Position < lo) view.Position = lo;
             if (view.Position + view.Size > hi) view.Position = hi - view.Size;
@@ -548,6 +549,17 @@ namespace Test
             }
         }
 
+        /// <summary>跟随窗口右端：数据活跃=当前时间（滚动），不活跃=数据末尾（防视图跳空）</summary>
+        private double ViewTailOADate()
+        {
+            bool dataActive = PlcData.IsConnected || Simulator.IsRunning;
+            if (dataActive)
+            {
+                return Math.Max(_lastPointTime.ToOADate(), DateTime.Now.ToOADate());
+            }
+            return _lastPointTime.ToOADate();
+        }
+
         /// <summary>分页移动（◀ 止于数据起点；▶ 到最新回跟随；无数据直接返回）</summary>
         private void PageMove(int dir)
         {
@@ -557,7 +569,7 @@ namespace Test
             }
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
             double start = _events[0].Time.ToOADate();           // 数据起点
-            double tail = Math.Max(_lastPointTime.ToOADate(), DateTime.Now.ToOADate());
+            double tail = ViewTailOADate();                      // 数据活跃=现在，不活跃=数据末尾
             if (dir < 0)   // 上一页（更早）
             {
                 double newPos = view.Position - PageSizeDays;
