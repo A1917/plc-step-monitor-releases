@@ -387,9 +387,10 @@ namespace Test
             }
         }
 
-        /// <summary>增量拉取 + 跟随模式下窗口贴最新（历史加载模式暂停增量；异常防护防 UI 卡死）</summary>
+        /// <summary>增量拉取 + 跟随模式下窗口贴最新（历史加载模式暂停增量；异常防护防 UI 卡死；模式切换检测）</summary>
         private void RefreshChart()
         {
+            CheckModeChange();   // 检测全局显示模式切换
             if (_loadingFromFile)
             {
                 return;   // 历史模式：不追加实时数据
@@ -462,6 +463,46 @@ namespace Test
                 }
             }
             _series.Points.AddXY(DateTime.Now, _events[_events.Count - 1].Step);
+        }
+
+        /// <summary>检测全局显示模式（实时/历史）切换，同步切换当前趋势图数据源</summary>
+        private void CheckModeChange()
+        {
+            bool nowHistory = EventStore.HistoryMode && EventStore.LoadedHistory != null;
+            if (nowHistory == _loadingFromFile)
+            {
+                return;   // 模式未变
+            }
+            // 模式已变：切换数据源
+            if (nowHistory)
+            {
+                // 实时 → 历史
+                var fileEvents = EventStore.LoadedHistory.FindAll(ev => ev.Station == _station);
+                if (fileEvents.Count > 0)
+                {
+                    _events.Clear();
+                    _events.AddRange(fileEvents);
+                    _lastPointTime = _events[_events.Count - 1].Time;
+                    _loadingFromFile = true;
+                    RebuildPoints();
+                    FitToData();   // 适应历史数据
+                    Text = "工位 " + _station + " 历史记录";
+                }
+            }
+            else
+            {
+                // 历史 → 实时：恢复实时数据
+                _loadingFromFile = false;
+                _events.Clear();
+                _events.AddRange(EventStore.GetAll(_station));
+                if (_events.Count > 0)
+                {
+                    _lastPointTime = _events[_events.Count - 1].Time;
+                }
+                RebuildPoints();
+                FitWindow();
+                Text = "工位 " + _station + " 实时趋势";
+            }
         }
 
         /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白）</summary>

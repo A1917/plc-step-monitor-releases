@@ -231,6 +231,8 @@ namespace Test
                     return;
                 }
                 EventStore.LoadedHistory = data;
+                EventStore.HistoryMode = true;   // 加载后自动切到历史模式
+                btnToggleMode.Text = "显示实时";
                 System.Windows.Forms.MessageBox.Show("已加载 " + data.Count + " 条事件记录\n双击工位格子查看历史趋势图");
             }
         }
@@ -242,6 +244,18 @@ namespace Test
             {
                 frm.ShowDialog(this);
             }
+        }
+
+        /// <summary>切换显示模式：实时 / 历史文件</summary>
+        private void btnToggleMode_Click(object sender, System.EventArgs e)
+        {
+            if (EventStore.LoadedHistory == null)
+            {
+                System.Windows.Forms.MessageBox.Show("请先加载历史文件");
+                return;
+            }
+            EventStore.HistoryMode = !EventStore.HistoryMode;
+            btnToggleMode.Text = EventStore.HistoryMode ? "显示实时" : "显示历史";
         }
 
         private void Form1_Load(object sender, System.EventArgs e)

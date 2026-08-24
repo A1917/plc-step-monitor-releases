@@ -20,6 +20,7 @@ namespace Test
         private CheckBox chkRecord;
         private Button btnLoadHistory;
         private Button btnMultiTrend;
+        private Button btnToggleMode;
 
         protected override void Dispose(bool disposing)
         {
@@ -47,6 +48,7 @@ namespace Test
             this.chkRecord = new System.Windows.Forms.CheckBox();
             this.btnLoadHistory = new System.Windows.Forms.Button();
             this.btnMultiTrend = new System.Windows.Forms.Button();
+            this.btnToggleMode = new System.Windows.Forms.Button();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -75,6 +77,7 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.btnToggleMode);
             this.panel1.Controls.Add(this.btnMultiTrend);
             this.panel1.Controls.Add(this.btnLoadHistory);
             this.panel1.Controls.Add(this.chkRecord);
@@ -153,6 +156,13 @@ namespace Test
             this.btnMultiTrend.Text = "总览趋势";
             this.btnMultiTrend.UseVisualStyleBackColor = true;
             this.btnMultiTrend.Click += new System.EventHandler(btnMultiTrend_Click);
+            this.btnToggleMode.Location = new System.Drawing.Point(550, 21);
+            this.btnToggleMode.Name = "btnToggleMode";
+            this.btnToggleMode.Size = new System.Drawing.Size(80, 25);
+            this.btnToggleMode.TabIndex = 14;
+            this.btnToggleMode.Text = "显示历史";
+            this.btnToggleMode.UseVisualStyleBackColor = true;
+            this.btnToggleMode.Click += new System.EventHandler(btnToggleMode_Click);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);

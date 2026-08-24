@@ -36,6 +36,9 @@ namespace Test
         /// <summary>通过主界面「加载」按钮载入的历史记录（全局共享，趋势图自动使用）</summary>
         public static List<StepEvent> LoadedHistory;
 
+        /// <summary>显示模式：true=历史文件，false=实时（主界面切换按钮控制）</summary>
+        public static bool HistoryMode;
+
         /// <summary>
         /// 轮询线程调用：喂入步值快照，与上次对比，变化则生成事件（时间戳=采样时刻）。
         /// 首次出现的工位也生成一个基线事件（趋势图无变化时也能显示当前步）。
