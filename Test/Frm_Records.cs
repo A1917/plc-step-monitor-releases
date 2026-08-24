@@ -654,6 +654,7 @@ namespace Test
             viewY.Size = newYSize;
             _followTail = false;
             ClampToNow();   // 右端不超当前时间
+            ClampYAxis();   // Y 轴不漂移（缩小/拖拽后视口不累积上移）
         }
 
         /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标</summary>
