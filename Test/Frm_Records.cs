@@ -29,6 +29,7 @@ namespace Test
         private double _panViewStart;
         private double _panYViewStart;
         private double _panYSizeStart;
+        private int _panPlotHeight = 1;                  // 绘图区像素高度（Y 拖拽灵敏度基准）
         private double _lastRangeStart, _lastRangeEnd;   // 区域线位置基线（锁定模式联动用）
         private Point _mousePos = new Point(-1, -1);     // 鼠标在图表上的位置（-1 = 不在图表）
         private bool _loadingFromFile;                    // 历史加载模式（暂停实时追加）
@@ -309,7 +310,7 @@ namespace Test
             chart1.Invalidate();
         }
 
-        /// <summary>适应当前页：X 轴四周预留空间；Y 轴以历史（内存全部数据）最大范围缩放</summary>
+        /// <summary>适应当前页：X 轴宽度恢复每页时长（右端保持当前页位置，不跨页）；Y 轴以历史（内存全部数据）最大范围缩放</summary>
         private void FitToData()
         {
             var area = chart1.ChartAreas[0];
@@ -318,6 +319,16 @@ namespace Test
             {
                 return;
             }
+            // X 轴：宽度恢复每页设置时长，右端保持当前窗口右端（不跳回最新页、不保留缩放宽度）
+            double right = view.Position + view.Size;
+            double tail = ViewTailOADate();
+            if (right > tail)
+            {
+                right = tail;   // 右端不超数据末尾/当前时间
+            }
+            view.Size = PageSizeDays;
+            view.Position = right - PageSizeDays;
+            ClampToNow();   // 左端不滑出数据起点
             // Y 轴：内存全部数据的最小~最大步号（历史最大范围，不被刚刷新的小步号压扁）
             short minY = short.MaxValue, maxY = short.MinValue;
             foreach (var ev in _events)
@@ -334,7 +345,6 @@ namespace Test
             // 上方留 10% 看全；下方最多 2 步留白且不显示负值区（防下方大面积留空）
             area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(padY, 2));
             area.AxisY.ScaleView.Size = ySpan + padY + Math.Min(padY, 2) + 1;
-            // 注意：不进入跟随模式、不移动 X 轴——适应只缩放当前页（保持当前位置）
             SyncRangeRect();
             UpdatePageLabel();
         }
@@ -522,6 +532,12 @@ namespace Test
             // 下方最多 2 步越界且不显示负值区（防拖拽后下方留空）
             double lo = Math.Max(0, minY - Math.Min(span * 0.2, 2));
             double hi = maxY + span * 0.2;
+            if (view.Size >= hi - lo)
+            {
+                // 视口已覆盖全部数据（缩小过多）：锁底，不做平移（防拖不动）
+                view.Position = lo;
+                return;
+            }
             if (view.Position < lo) view.Position = lo;
             if (view.Position + view.Size > hi) view.Position = hi - view.Size;
         }
@@ -670,6 +686,7 @@ namespace Test
                 {
                     view.Position = x - PageSizeDays / 2;
                     _followTail = false;
+                    ClampToNow();   // 居中滚动后不甩出数据边界
                     SyncRangeRect();
                     UpdatePageLabel();
                 }
@@ -694,7 +711,10 @@ namespace Test
             var area = chart1.ChartAreas[0];
             _isPanning = true;
             _panStart = e.Location;
-            _panViewStart = area.AxisX.ScaleView.Position;
+            double xPos = area.AxisX.ScaleView.Position;
+            _panViewStart = double.IsNaN(xPos) ? plotRect.Left : xPos;   // NaN 保护
+            // 绘图区实际像素高度（Y 拖拽灵敏度用绘图区而非控件高度）
+            _panPlotHeight = plotRect.Height;
             // Y 轴缩放状态可能未激活（NaN），取当前可视范围作为平移基准
             _panYSizeStart = double.IsNaN(area.AxisY.ScaleView.Size)
                 ? (area.AxisY.Maximum - area.AxisY.Minimum)
@@ -726,7 +746,7 @@ namespace Test
                 var area = chart1.ChartAreas[0];
                 double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
                 area.AxisX.ScaleView.Position = _panViewStart + dx;
-                double dy = (e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
+                double dy = (e.Y - _panStart.Y) / (double)Math.Max(_panPlotHeight, 1) * _panYSizeStart;
                 area.AxisY.ScaleView.Position = _panYViewStart + dy;
                 area.AxisY.ScaleView.Size = _panYSizeStart;
                 _followTail = false;
