@@ -542,7 +542,7 @@ namespace Test
             if (view.Position + view.Size > hi) view.Position = hi - view.Size;
         }
 
-        /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白）</summary>
+        /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白；窗口比数据大时锁左端防互搏）</summary>
         private void ClampToNow()
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
@@ -551,17 +551,23 @@ namespace Test
                 return;
             }
             double now = DateTime.Now.ToOADate();
-            if (view.Position + view.Size > now + 0.0001)
-            {
-                view.Position = now - view.Size;
-            }
             if (_events.Count > 0)
             {
                 double dataStart = _events[0].Time.ToOADate();
+                if (view.Size >= now - dataStart)
+                {
+                    // 窗口比数据跨度大（左右必有空白）：固定左端贴数据起点，不做 clamp 互搏（防拖拽跳空白）
+                    view.Position = dataStart;
+                    return;
+                }
                 if (view.Position < dataStart - 0.0001)
                 {
                     view.Position = dataStart;   // 左侧不能滑出无数据区域
                 }
+            }
+            if (view.Position + view.Size > now + 0.0001)
+            {
+                view.Position = now - view.Size;
             }
         }
 
