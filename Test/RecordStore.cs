@@ -55,12 +55,12 @@ namespace Test
         /// <summary>写入一条事件（EventStore 变化时调用，线程安全）</summary>
         public static void Write(int station, DateTime time, short step)
         {
-            if (!Enabled || _sessionFile.Length == 0)
-            {
-                return;
-            }
             lock (_lock)
             {
+                if (!Enabled || _sessionFile.Length == 0)
+                {
+                    return;
+                }
                 try
                 {
                     using (var sw = new StreamWriter(_sessionFile, true, new UTF8Encoding(true)))

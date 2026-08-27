@@ -283,6 +283,7 @@ namespace Test
             {
                 _stateThd.Join(2000);
             }
+            _cts.Dispose();   // 释放内核句柄（WaitHandle）
             try
             {
                 if (PlcData.omronFinsNet != null)

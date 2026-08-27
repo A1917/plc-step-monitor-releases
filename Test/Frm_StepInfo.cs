@@ -169,14 +169,15 @@ namespace Test
                     }
                     int simStation = PlcData.StepCount - 1;
                     int lblLen = labels.Length;
+                    short[] steps = PlcData.ThdStep;   // 取同一快照（防循环中被整体替换导致取值错位）
                     foreach (int idx in changed)
                     {
-                        if (idx >= lblLen)
+                        if (idx >= lblLen || idx >= steps.Length)
                         {
                             continue;   // 网格已重建（工位数变化），跳过旧索引
                         }
                         string prefix = (Simulator.IsRunning && idx == simStation) ? "模拟" + idx : "工位" + idx;
-                        labels[idx].Text = prefix + ":\n" + PlcData.ThdStep[idx];
+                        labels[idx].Text = prefix + ":\n" + steps[idx];
                     }
                 });
             }
@@ -205,6 +206,7 @@ namespace Test
             {
                 _thdUpdate.Join(2000);
             }
+            _cts.Dispose();   // 释放内核句柄（WaitHandle）
         }
     }
 }

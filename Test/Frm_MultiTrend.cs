@@ -297,9 +297,21 @@ namespace Test
             double x1 = Math.Min(_curStart.X, _curEnd.X);
             double x2 = Math.Max(_curStart.X, _curEnd.X);
             double durMs = (x2 - x1) * 86400000.0;
-            lblInfo.Text = "区域 " + DateTime.FromOADate(x1).ToString("HH:mm:ss.fff")
-                           + " ~ " + DateTime.FromOADate(x2).ToString("HH:mm:ss.fff")
+            DateTime t1 = SafeFromOADate(x1);
+            DateTime t2 = SafeFromOADate(x2);
+            lblInfo.Text = "区域 " + t1.ToString("HH:mm:ss.fff")
+                           + " ~ " + t2.ToString("HH:mm:ss.fff")
                            + "  时长 " + durMs.ToString("F0") + " ms";
+        }
+
+        /// <summary>安全 OADate 转换（NaN/越界返回 MinValue，防 FromOADate 抛异常）</summary>
+        private static DateTime SafeFromOADate(double v)
+        {
+            if (double.IsNaN(v) || v < 0 || v > 2958465.99)
+            {
+                return DateTime.MinValue;
+            }
+            return DateTime.FromOADate(v);
         }
 
         /// <summary>适应：X/Y 轴覆盖全部选中数据（含 10% 留白）</summary>
@@ -345,7 +357,7 @@ namespace Test
 
             double factor = e.Delta > 0 ? 0.8 : 1.25;
             var viewX = area.AxisX.ScaleView;
-            double xSize = viewX.Size;
+            double xSize = double.IsNaN(viewX.Size) || viewX.Size <= 0 ? 0.5 / 86400000.0 : viewX.Size;   // 除零/NaN 防御
             double newXSize = Math.Max(xSize * factor, 0.5 / 86400000.0);
             double fX = newXSize / xSize;
             viewX.Position = mouseX - (mouseX - viewX.Position) * fX;
@@ -440,7 +452,7 @@ namespace Test
         private void UpdateCursorInfo()
         {
             if (double.IsNaN(_cursor.X)) return;
-            DateTime t = DateTime.FromOADate(_cursor.X);
+            DateTime t = SafeFromOADate(_cursor.X);
             var parts = new List<string>();
             parts.Add("游标 " + t.ToString("HH:mm:ss.fff"));
             foreach (int i in chkStations.CheckedIndices)

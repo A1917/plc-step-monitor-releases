@@ -57,12 +57,12 @@ namespace Test
         /// <summary>停止模拟</summary>
         public static void Stop()
         {
+            _timer.Change(Timeout.Infinite, Timeout.Infinite);   // 先停 timer（减少与 OnTick 的 Change 竞态窗口）
             lock (_lockObj)
             {
                 IsRunning = false;
                 _station = -1;
             }
-            _timer.Change(Timeout.Infinite, Timeout.Infinite);
         }
 
         private static void OnTick(object state)

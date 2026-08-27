@@ -201,7 +201,11 @@ namespace Test
                 _timer.Interval = intervals[Math.Min(idx, intervals.Length - 1)];
             };
             _timer.Start();
-            FormClosing += (s, e) => _timer.Stop();
+            FormClosing += (s, e) =>
+            {
+                _timer.Stop();
+                _labelFont.Dispose();   // 释放 GDI 句柄
+            };
         }
 
         /// <summary>初始化游标注释</summary>
@@ -662,7 +666,7 @@ namespace Test
             }
             double factor = e.Delta > 0 ? 0.8 : 1.25;
             var viewX = area.AxisX.ScaleView;
-            double xSize = viewX.Size;
+            double xSize = double.IsNaN(viewX.Size) || viewX.Size <= 0 ? 0.5 / 86400000.0 : viewX.Size;   // 除零/NaN 防御
             // 先算新宽度（含 clamp：下限 0.5ms / 上限每页时长），再按实际比例定锚点
             double newXSize = Math.Min(Math.Max(xSize * factor, 0.5 / 86400000.0), PageSizeDays);
             double fX = newXSize / xSize;
