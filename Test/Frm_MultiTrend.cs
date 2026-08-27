@@ -9,11 +9,25 @@ namespace Test
 {
     public partial class Frm_MultiTrend : Form
     {
-        /// <summary>Y 轴 0 中轴对称范围（half = 数据最大绝对值 ×1.1 留白，0 在中间）</summary>
-        private static double ZeroCenterHalf(short minY, short maxY)
+        /// <summary>Y 轴刻度更新：步进随视野缩放自动选 nice 值（1/2/5×10ⁿ），0 始终是一条刻度线</summary>
+        private void UpdateYTicks()
         {
-            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
-            return m * 1.1;
+            var area = chart1.ChartAreas[0];
+            var view = area.AxisY.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            double span = view.Size;
+            if (span <= 0) return;
+            double raw = span / 5.0;
+            double nice = Math.Pow(10, Math.Floor(Math.Log10(Math.Max(raw, 1e-9))));
+            double m = raw / nice;
+            if (m >= 5) nice *= 5;
+            else if (m >= 2) nice *= 2;
+            if (nice < 1) nice = 1;
+            var axis = area.AxisY;
+            axis.Interval = nice;
+            double start = view.Position;
+            double off = (nice - (start % nice)) % nice;
+            axis.IntervalOffset = off;
         }
         private readonly List<StepEvent> _data;
         private readonly Dictionary<int, List<StepEvent>> _byStation;   // 每工位时间有序事件
@@ -247,9 +261,9 @@ namespace Test
             if (gMinY != short.MaxValue)
             {
                 double span = Math.Max(gMaxY - gMinY, 1);
-                double half = ZeroCenterHalf(gMinY, gMaxY);   // 0 中轴对称
-                chart1.ChartAreas[0].AxisY.ScaleView.Position = -half;
-                chart1.ChartAreas[0].AxisY.ScaleView.Size = half * 2 + 1;
+                chart1.ChartAreas[0].AxisY.ScaleView.Position = gMinY - span * 0.1;
+                chart1.ChartAreas[0].AxisY.ScaleView.Size = span * 1.2 + 1;
+                UpdateYTicks();
             }
             if (gStart != double.MaxValue)
             {
@@ -341,9 +355,9 @@ namespace Test
             }
             if (minY == short.MaxValue) return;
             double ySpan = Math.Max(maxY - minY, 1);
-            double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
-            area.AxisY.ScaleView.Position = -half;
-            area.AxisY.ScaleView.Size = half * 2 + 1;
+            area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+            area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+            UpdateYTicks();
             area.AxisX.ScaleView.Position = gStart;
             area.AxisX.ScaleView.Size = Math.Max(gEnd - gStart, 0.5 / 86400000.0);
         }

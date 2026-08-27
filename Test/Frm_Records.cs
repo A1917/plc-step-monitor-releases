@@ -12,11 +12,26 @@ namespace Test
     /// </summary>
     public partial class Frm_Records : Form
     {
-        /// <summary>Y 轴 0 中轴对称范围（half = 数据最大绝对值 ×1.1 留白，0 在中间）</summary>
-        private static double ZeroCenterHalf(short minY, short maxY)
+        /// <summary>Y 轴刻度更新：步进随视野缩放自动选 nice 值（1/2/5×10ⁿ），0 始终是一条刻度线</summary>
+        private void UpdateYTicks()
         {
-            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
-            return m * 1.1;
+            var area = chart1.ChartAreas[0];
+            var view = area.AxisY.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            double span = view.Size;
+            if (span <= 0) return;
+            double raw = span / 5.0;   // 目标约 5 条刻度
+            double nice = Math.Pow(10, Math.Floor(Math.Log10(Math.Max(raw, 1e-9))));
+            double m = raw / nice;
+            if (m >= 5) nice *= 5;
+            else if (m >= 2) nice *= 2;
+            if (nice < 1) nice = 1;    // 步号整数，间隔不小于 1
+            var axis = area.AxisY;
+            axis.Interval = nice;
+            // 0 基准对齐：第一个刻度偏移 = (nice - 可视起点%nice) % nice，使 0 落在刻度线上
+            double start = view.Position;
+            double off = (nice - (start % nice)) % nice;
+            axis.IntervalOffset = off;
         }
         private readonly int _station;
         private readonly Timer _timer;
@@ -173,9 +188,9 @@ namespace Test
                     short minY = short.MaxValue, maxY = short.MinValue;
                     foreach (var ev in _events) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
                     double ySpan = Math.Max(maxY - minY, 1);
-                    double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
-                    chartArea.AxisY.ScaleView.Position = -half;
-                    chartArea.AxisY.ScaleView.Size = half * 2 + 1;
+                    chartArea.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                    chartArea.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                    UpdateYTicks();
                     _followTail = false;
                     UpdatePageLabel();
                     SyncRangeRect();
@@ -289,9 +304,9 @@ namespace Test
             view.Size = PageSizeDays;
             if (_events.Count == 0)
             {
-                // 无数据：显式给 Y 轴合理范围（0 中轴对称），避免轴 NaN 导致图表白屏
-                area.AxisY.ScaleView.Position = -11;
-                area.AxisY.ScaleView.Size = 22;
+                // 无数据：显式给 Y 轴合理范围，避免轴 NaN 导致图表白屏
+                area.AxisY.ScaleView.Position = 0;
+                area.AxisY.ScaleView.Size = 10;
             }
             PlaceCursorInView();
             PlaceRangeInView();
@@ -353,12 +368,13 @@ namespace Test
                 minY = 0; maxY = 1;
             }
             double ySpan = Math.Max(maxY - minY, 1);
-            // 0 中轴对称显示（0 在中间，上下对称 10% 留白）
-            double half = ZeroCenterHalf(minY, maxY);
-            area.AxisY.ScaleView.Position = -half;
-            area.AxisY.ScaleView.Size = half * 2 + 1;
+            double padY = ySpan * 0.1;
+            // 上下对称留 10%（0 以下可见，不强制贴底）
+            area.AxisY.ScaleView.Position = minY - padY;
+            area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
             SyncRangeRect();
             UpdatePageLabel();
+            UpdateYTicks();
         }
 
         /// <summary>加载历史记录文件（records/events_日期.csv），进入历史查看模式</summary>
@@ -399,9 +415,9 @@ namespace Test
                     if (ev.Step > maxY) maxY = ev.Step;
                 }
                 double ySpan = Math.Max(maxY - minY, 1);
-                double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
-                area.AxisY.ScaleView.Position = -half;
-                area.AxisY.ScaleView.Size = half * 2 + 1;
+                area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
+                area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                UpdateYTicks();
                 _followTail = false;
                 UpdatePageLabel();
                 SyncRangeRect();
@@ -541,14 +557,14 @@ namespace Test
                 if (ev.Step > maxY) maxY = ev.Step;
             }
             if (minY == short.MaxValue) return;
-            // 0 中轴对称 clamp：范围 [-1.2M, 1.2M]（M = 数据最大绝对值，防漂移/防曲线消失）
-            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
-            double lo = -m * 1.2;
-            double hi = m * 1.2;
+            double span = Math.Max(maxY - minY, 1);
+            // 上下各 20% 越界防护（防拖拽漂移把曲线推出视野）
+            double lo = minY - span * 0.2;
+            double hi = maxY + span * 0.2;
             if (view.Size >= hi - lo)
             {
-                // 视口已覆盖全部数据（缩小过多）：锁中轴，不做平移（防拖不动）
-                view.Position = -m;
+                // 视口已覆盖全部数据（缩小过多）：锁底，不做平移（防拖不动）
+                view.Position = lo;
                 return;
             }
             if (view.Position < lo) view.Position = lo;
@@ -690,6 +706,7 @@ namespace Test
             _followTail = false;
             ClampToNow();   // 右端不超当前时间
             ClampYAxis();   // Y 轴不漂移（缩小/拖拽后视口不累积上移）
+            UpdateYTicks();   // 刻度步进/0 基准随视野更新
         }
 
         /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标</summary>
@@ -771,6 +788,7 @@ namespace Test
                 _followTail = false;
                 ClampToNow();   // 右端不超当前时间（防拖出空白）
                 ClampYAxis();   // Y 轴不拖出数据范围（防曲线消失）
+                UpdateYTicks();   // 刻度步进/0 基准随视野更新
                 // 同步拖拽基准（clamp 后 Position 可能被调整——不同步会导致回拖时跳回旧值"反弹"）
                 _panViewStart = area.AxisX.ScaleView.Position;
                 _panYViewStart = area.AxisY.ScaleView.Position;
