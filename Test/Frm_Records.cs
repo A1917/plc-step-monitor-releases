@@ -115,14 +115,13 @@ namespace Test
                 _draggingWhich = -1;   // 松开：各线标签保持当前位置（独立记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
-                // 仅实时数据活跃时：拖到最右端 → 进入跟随模式（贴当前时间滚动）
-                // 历史/断开场景不触发——松手保持当前位置（右端已被 clamp 贴数据末尾），不重置窗口宽度
+                // 实时数据活跃时：拖到最右端 → 进入跟随模式（保持当前窗口宽度，右端贴最新——不重置宽度防视野跳变）
                 bool dataActive = PlcData.IsConnected || Simulator.IsRunning;
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
                 if (dataActive && _events.Count > 0 && view.Position + view.Size >= _lastPointTime.ToOADate())
                 {
                     _followTail = true;
-                    view.Position = ViewTailOADate() - PageSizeDays;
+                    view.Position = ViewTailOADate() - view.Size;   // 保持放大宽度，仅右端贴最新
                 }
             };
             chart1.MouseLeave += (s, e) =>
@@ -447,7 +446,7 @@ namespace Test
                     {
                         var view = chart1.ChartAreas[0].AxisX.ScaleView;
                         DateTime tail = DateTime.Now;
-                        view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                        view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
                         ExtendCurrentStep();   // 曲线右端延伸当前步
                     }
                     return;
@@ -471,7 +470,7 @@ namespace Test
                     {
                         var view = chart1.ChartAreas[0].AxisX.ScaleView;
                         DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
-                        view.Position = tail.AddMilliseconds(-PageSizeMs).ToOADate();
+                        view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
                         ExtendCurrentStep();   // 曲线右端延伸当前步
                     }
                 }
