@@ -43,6 +43,16 @@ namespace Test
             int rows = (count + GridColumns - 1) / GridColumns;
 
             tblayout_Step.SuspendLayout();
+            // 释放旧标签（含 Font，防 GDI 句柄泄漏）
+            foreach (Control c in tblayout_Step.Controls)
+            {
+                var lb = c as Label;
+                if (lb != null && lb.Font != null)
+                {
+                    lb.Font.Dispose();
+                }
+                c.Dispose();
+            }
             tblayout_Step.Controls.Clear();
             tblayout_Step.RowStyles.Clear();
             tblayout_Step.ColumnStyles.Clear();
@@ -147,8 +157,13 @@ namespace Test
                         return;
                     }
                     int simStation = PlcData.StepCount - 1;
+                    int lblLen = labels.Length;
                     foreach (int idx in changed)
                     {
+                        if (idx >= lblLen)
+                        {
+                            continue;   // 网格已重建（工位数变化），跳过旧索引
+                        }
                         string prefix = (Simulator.IsRunning && idx == simStation) ? "模拟" + idx : "工位" + idx;
                         labels[idx].Text = prefix + ":\n" + PlcData.ThdStep[idx];
                     }
