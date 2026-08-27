@@ -82,6 +82,17 @@ namespace Test
                     BorderStyle = BorderStyle.FixedSingle,
                     Text = "工位" + i + ":\n0"
                 };
+                // 启用双缓冲，防步号更新时闪烁
+                try
+                {
+                    var prop = typeof(Label).GetProperty("DoubleBuffered",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    if (prop != null)
+                    {
+                        prop.SetValue(labels[i], true, null);
+                    }
+                }
+                catch { }
                 int idx = i;   // 闭包捕获
                 labels[i].DoubleClick += (s, e) => OpenTrend(idx);
                 tblayout_Step.Controls.Add(labels[i], i % GridColumns, i / GridColumns);

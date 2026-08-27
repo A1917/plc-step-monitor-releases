@@ -239,7 +239,7 @@ namespace Test
             if (gMinY != short.MaxValue)
             {
                 double span = Math.Max(gMaxY - gMinY, 1);
-                chart1.ChartAreas[0].AxisY.ScaleView.Position = Math.Max(0, gMinY - Math.Min(span * 0.1, 2));
+                chart1.ChartAreas[0].AxisY.ScaleView.Position = gMinY - span * 0.1;
                 chart1.ChartAreas[0].AxisY.ScaleView.Size = span * 1.2 + 1;
             }
             if (gStart != double.MaxValue)
@@ -320,7 +320,7 @@ namespace Test
             }
             if (minY == short.MaxValue) return;
             double ySpan = Math.Max(maxY - minY, 1);
-            area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(ySpan * 0.1, 2));
+            area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
             area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
             area.AxisX.ScaleView.Position = gStart;
             area.AxisX.ScaleView.Size = Math.Max(gEnd - gStart, 0.5 / 86400000.0);

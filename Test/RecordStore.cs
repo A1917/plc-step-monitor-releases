@@ -28,13 +28,13 @@ namespace Test
             }
         }
 
-        /// <summary>开始记录会话：新建独立文件（每次开启 = 新的一份）</summary>
+        /// <summary>开始记录会话：新建独立文件（每次开启 = 新的一份，PLCStep_ 前缀）</summary>
         public static void Start()
         {
             lock (_lock)
             {
                 Directory.CreateDirectory(RecordsDir);
-                string name = "events_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".csv";
+                string name = "PLCStep_events_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + ".csv";
                 _sessionFile = Path.Combine(RecordsDir, name);
                 File.WriteAllText(_sessionFile, "时间,工位,步号\r\n", new UTF8Encoding(true));   // 表头
                 Enabled = true;

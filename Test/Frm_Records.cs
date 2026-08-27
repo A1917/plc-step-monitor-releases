@@ -157,16 +157,16 @@ namespace Test
                     _lastPointTime = _events[_events.Count - 1].Time;
                     _loadingFromFile = true;
                     RebuildPoints();
-                    // 手动适应显示历史数据
+                    // 窗口显示每页时长（右端贴数据末尾），不全量显示——翻页查看其他时段
                     var chartArea = chart1.ChartAreas[0];
-                    double start = _events[0].Time.ToOADate();
                     double end = _events[_events.Count - 1].Time.ToOADate();
+                    double start = end - PageSizeDays;
                     chartArea.AxisX.ScaleView.Position = start;
-                    chartArea.AxisX.ScaleView.Size = Math.Max(end - start, 0.5 / 86400000.0);
+                    chartArea.AxisX.ScaleView.Size = PageSizeDays;
                     short minY = short.MaxValue, maxY = short.MinValue;
                     foreach (var ev in _events) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
                     double ySpan = Math.Max(maxY - minY, 1);
-                    chartArea.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(ySpan * 0.1, 2));
+                    chartArea.AxisY.ScaleView.Position = minY - ySpan * 0.1;
                     chartArea.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
                     _followTail = false;
                     UpdatePageLabel();
@@ -342,9 +342,9 @@ namespace Test
             }
             double ySpan = Math.Max(maxY - minY, 1);
             double padY = ySpan * 0.1;
-            // 上方留 10% 看全；下方最多 2 步留白且不显示负值区（防下方大面积留空）
-            area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(padY, 2));
-            area.AxisY.ScaleView.Size = ySpan + padY + Math.Min(padY, 2) + 1;
+            // 上下对称留 10%（0 以下可见，不强制贴底）
+            area.AxisY.ScaleView.Position = minY - padY;
+            area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
             SyncRangeRect();
             UpdatePageLabel();
         }
@@ -374,12 +374,12 @@ namespace Test
                 _lastPointTime = _events[_events.Count - 1].Time;
 
                 RebuildPoints();
-                // 适应显示文件全部数据
+                // 窗口显示每页时长（右端贴数据末尾），不全量显示——翻页查看其他时段
                 var area = chart1.ChartAreas[0];
-                double start = _events[0].Time.ToOADate();
                 double end = _events[_events.Count - 1].Time.ToOADate();
+                double start = end - PageSizeDays;
                 area.AxisX.ScaleView.Position = start;
-                area.AxisX.ScaleView.Size = Math.Max(end - start, 0.5 / 86400000.0);
+                area.AxisX.ScaleView.Size = PageSizeDays;
                 short minY = short.MaxValue, maxY = short.MinValue;
                 foreach (var ev in _events)
                 {
@@ -387,7 +387,7 @@ namespace Test
                     if (ev.Step > maxY) maxY = ev.Step;
                 }
                 double ySpan = Math.Max(maxY - minY, 1);
-                area.AxisY.ScaleView.Position = Math.Max(0, minY - Math.Min(ySpan * 0.1, 2));
+                area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
                 area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
                 _followTail = false;
                 UpdatePageLabel();
@@ -529,8 +529,8 @@ namespace Test
             }
             if (minY == short.MaxValue) return;
             double span = Math.Max(maxY - minY, 1);
-            // 下方最多 2 步越界且不显示负值区（防拖拽后下方留空）
-            double lo = Math.Max(0, minY - Math.Min(span * 0.2, 2));
+            // 上方 20% 越界防护（防拖拽漂移把曲线压到顶部）；下方放开 20% 越界（0 以下可见）
+            double lo = minY - span * 0.2;
             double hi = maxY + span * 0.2;
             if (view.Size >= hi - lo)
             {
@@ -542,7 +542,7 @@ namespace Test
             if (view.Position + view.Size > hi) view.Position = hi - view.Size;
         }
 
-        /// <summary>窗口右端不超当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白；窗口比数据大时锁左端防互搏）</summary>
+        /// <summary>窗口右端不超数据末尾/当前时间、左端不滑出数据起点（防拖拽/缩放拖出空白；窗口比数据大时锁左端防互搏）</summary>
         private void ClampToNow()
         {
             var view = chart1.ChartAreas[0].AxisX.ScaleView;
@@ -550,11 +550,11 @@ namespace Test
             {
                 return;
             }
-            double now = DateTime.Now.ToOADate();
+            double tail = ViewTailOADate();   // 数据活跃=当前时间，不活跃=数据末尾
             if (_events.Count > 0)
             {
                 double dataStart = _events[0].Time.ToOADate();
-                if (view.Size >= now - dataStart)
+                if (view.Size >= tail - dataStart)
                 {
                     // 窗口比数据跨度大（左右必有空白）：固定左端贴数据起点，不做 clamp 互搏（防拖拽跳空白）
                     view.Position = dataStart;
@@ -565,9 +565,9 @@ namespace Test
                     view.Position = dataStart;   // 左侧不能滑出无数据区域
                 }
             }
-            if (view.Position + view.Size > now + 0.0001)
+            if (view.Position + view.Size > tail + 0.0001)
             {
-                view.Position = now - view.Size;
+                view.Position = tail - view.Size;   // 右端不超数据末尾/当前时间
             }
         }
 
@@ -734,10 +734,10 @@ namespace Test
         private void OnChartMouseMove(object sender, MouseEventArgs e)
         {
             _mousePos = e.Location;
-            // 拖动中：只有被拖动的线标签跟随鼠标（上方 68px，靠近顶部翻到下方）
+            // 拖动中：只有被拖动的线标签跟随鼠标（上方 136px，靠近顶部翻到下方）
             if (_draggingWhich >= 0)
             {
-                float y = _mousePos.Y > 70 ? _mousePos.Y - 68 : _mousePos.Y + 12;
+                float y = _mousePos.Y > 140 ? _mousePos.Y - 136 : _mousePos.Y + 12;
                 if (_draggingWhich == 0) _cursorLabelY = y;
                 else if (_draggingWhich == 1) _startLabelY = y;
                 else if (_draggingWhich == 2) _endLabelY = y;
@@ -880,13 +880,20 @@ namespace Test
             return step < 0 ? "步号 --" : "步号 " + step;
         }
 
-        /// <summary>分层绘制步号标签：每根线独立基准 Y（拖动时跟随鼠标），重叠自动向下错开</summary>
+        /// <summary>分层绘制步号标签：每根线独立基准 Y（拖动时跟随鼠标），重叠自动向下错开，Y 限定在绘图区内</summary>
         private void DrawStepTags(Graphics g, ChartArea area, List<TagItem> tags)
         {
             float topBase = (float)(area.Position.Y / 100 * chart1.Height + 2);   // 顶部基准
             double plotLeft = area.Position.X / 100 * chart1.Width;
 
-            // 计算每个标签像素范围（BaseY = -1 用顶部）
+            // 绘图区像素边界（InnerPlotPosition 为相对百分比）
+            var outer = area.Position;
+            var inner = area.InnerPlotPosition;
+            float plotTop = (float)(chart1.Height * (outer.Y + outer.Height * inner.Y / 100) / 100);
+            float plotBottom = (float)(chart1.Height * (outer.Y + outer.Height * (inner.Y + inner.Height) / 100) / 100);
+            float maxBase = plotBottom - 24;   // 标签底部不超出绘图区
+
+            // 计算每个标签像素范围（BaseY = -1 用顶部；clamp 在绘图区内）
             var items = new List<TagLayout>();
             foreach (var t in tags)
             {
@@ -894,7 +901,8 @@ namespace Test
                 SizeF sz = g.MeasureString(t.Text, _labelFont);
                 float l = xPix - sz.Width / 2 - 4;
                 if (l < plotLeft) l = (float)plotLeft;
-                float baseY = t.BaseY >= 0 ? t.BaseY : topBase;
+                float rawBase = t.BaseY >= 0 ? t.BaseY : topBase;
+                float baseY = Math.Min(Math.Max(rawBase, plotTop), maxBase);   // 限定在图表内
                 items.Add(new TagLayout(l, l + sz.Width + 8, t.Text, t.Color, baseY));
             }
             items.Sort((a, b) => a.Left.CompareTo(b.Left));
