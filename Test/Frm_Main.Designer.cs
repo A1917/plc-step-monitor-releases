@@ -21,6 +21,8 @@ namespace Test
         private Button btnLoadHistory;
         private Button btnMultiTrend;
         private Button btnToggleMode;
+        private Label lblRecordPrefix;
+        private TextBox txtRecordPrefix;
 
         protected override void Dispose(bool disposing)
         {
@@ -49,6 +51,8 @@ namespace Test
             this.btnLoadHistory = new System.Windows.Forms.Button();
             this.btnMultiTrend = new System.Windows.Forms.Button();
             this.btnToggleMode = new System.Windows.Forms.Button();
+            this.lblRecordPrefix = new System.Windows.Forms.Label();
+            this.txtRecordPrefix = new System.Windows.Forms.TextBox();
             this.panel1.SuspendLayout();
             base.SuspendLayout();
             this.btnConnect.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
@@ -77,6 +81,8 @@ namespace Test
             this.label1.Size = new System.Drawing.Size(65, 16);
             this.label1.TabIndex = 2;
             this.label1.Text = "心跳";
+            this.panel1.Controls.Add(this.txtRecordPrefix);
+            this.panel1.Controls.Add(this.lblRecordPrefix);
             this.panel1.Controls.Add(this.btnToggleMode);
             this.panel1.Controls.Add(this.btnMultiTrend);
             this.panel1.Controls.Add(this.btnLoadHistory);
@@ -163,6 +169,17 @@ namespace Test
             this.btnToggleMode.Text = "显示历史";
             this.btnToggleMode.UseVisualStyleBackColor = true;
             this.btnToggleMode.Click += new System.EventHandler(btnToggleMode_Click);
+            this.lblRecordPrefix.AutoSize = true;
+            this.lblRecordPrefix.Location = new System.Drawing.Point(320, 52);
+            this.lblRecordPrefix.Name = "lblRecordPrefix";
+            this.lblRecordPrefix.Size = new System.Drawing.Size(50, 16);
+            this.lblRecordPrefix.TabIndex = 15;
+            this.lblRecordPrefix.Text = "记录名";
+            this.txtRecordPrefix.Location = new System.Drawing.Point(374, 49);
+            this.txtRecordPrefix.Name = "txtRecordPrefix";
+            this.txtRecordPrefix.Size = new System.Drawing.Size(120, 23);
+            this.txtRecordPrefix.TabIndex = 16;
+            this.txtRecordPrefix.Text = "PLCStep";
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(1336, 778);

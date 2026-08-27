@@ -71,6 +71,8 @@ namespace Test
             area.AxisX.Title = "时间";
             area.AxisY.Title = "步号";
             area.AxisY.IsStartedFromZero = false;
+            area.AxisY.IntervalAutoMode = IntervalAutoMode.FixedCount;   // 固定刻度数量（缩放不产生 0.5/2.5 类碎刻度）
+            area.AxisY.Interval = 6;
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
             area.AxisY.LabelStyle.Format = "0";                    // Y 轴整数显示（步号无小数）
             area.CursorX.IsUserEnabled = true;
@@ -758,6 +760,9 @@ namespace Test
                 _followTail = false;
                 ClampToNow();   // 右端不超当前时间（防拖出空白）
                 ClampYAxis();   // Y 轴不拖出数据范围（防曲线消失）
+                // 同步拖拽基准（clamp 后 Position 可能被调整——不同步会导致回拖时跳回旧值"反弹"）
+                _panViewStart = area.AxisX.ScaleView.Position;
+                _panYViewStart = area.AxisY.ScaleView.Position;
                 SyncRangeRect();
                 UpdatePageLabel();
                 return;

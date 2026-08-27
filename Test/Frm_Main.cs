@@ -199,12 +199,12 @@ namespace Test
             }
         }
 
-        /// <summary>记录开关：每次开启新建独立记录文件（events_日期_时间戳.csv）</summary>
+        /// <summary>记录开关：每次开启新建独立记录文件（前缀=记录名输入框，默认 PLCStep）</summary>
         private void chkRecord_CheckedChanged(object sender, System.EventArgs e)
         {
             if (chkRecord.Checked)
             {
-                RecordStore.Start();
+                RecordStore.Start(txtRecordPrefix.Text);
             }
             else
             {

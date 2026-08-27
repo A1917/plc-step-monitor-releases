@@ -64,6 +64,8 @@ namespace Test
             area.AxisY.Title = "步号";
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
             area.AxisY.IsStartedFromZero = false;
+            area.AxisY.IntervalAutoMode = IntervalAutoMode.FixedCount;   // 固定刻度数量
+            area.AxisY.Interval = 6;
             area.AxisX.ScaleView.Zoomable = true;
             area.AxisY.ScaleView.Zoomable = true;
             area.CursorX.IsUserEnabled = true;
