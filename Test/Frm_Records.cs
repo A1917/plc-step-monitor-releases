@@ -12,6 +12,12 @@ namespace Test
     /// </summary>
     public partial class Frm_Records : Form
     {
+        /// <summary>Y 轴 0 中轴对称范围（half = 数据最大绝对值 ×1.1 留白，0 在中间）</summary>
+        private static double ZeroCenterHalf(short minY, short maxY)
+        {
+            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
+            return m * 1.1;
+        }
         private readonly int _station;
         private readonly Timer _timer;
         private readonly Series _series;
@@ -71,8 +77,7 @@ namespace Test
             area.AxisX.Title = "时间";
             area.AxisY.Title = "步号";
             area.AxisY.IsStartedFromZero = false;
-            area.AxisY.IntervalAutoMode = IntervalAutoMode.FixedCount;   // 固定刻度数量（缩放不产生 0.5/2.5 类碎刻度）
-            area.AxisY.Interval = 6;
+            // 自动刻度：步进随视野缩放自动变化（0.5/1/2/5/10 系列）
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
             area.AxisY.LabelStyle.Format = "0";                    // Y 轴整数显示（步号无小数）
             area.CursorX.IsUserEnabled = true;
@@ -168,8 +173,9 @@ namespace Test
                     short minY = short.MaxValue, maxY = short.MinValue;
                     foreach (var ev in _events) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
                     double ySpan = Math.Max(maxY - minY, 1);
-                    chartArea.AxisY.ScaleView.Position = minY - ySpan * 0.1;
-                    chartArea.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                    double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
+                    chartArea.AxisY.ScaleView.Position = -half;
+                    chartArea.AxisY.ScaleView.Size = half * 2 + 1;
                     _followTail = false;
                     UpdatePageLabel();
                     SyncRangeRect();
@@ -283,9 +289,9 @@ namespace Test
             view.Size = PageSizeDays;
             if (_events.Count == 0)
             {
-                // 无数据：显式给 Y 轴合理范围，避免轴 NaN 导致图表白屏
-                area.AxisY.ScaleView.Position = 0;
-                area.AxisY.ScaleView.Size = 10;
+                // 无数据：显式给 Y 轴合理范围（0 中轴对称），避免轴 NaN 导致图表白屏
+                area.AxisY.ScaleView.Position = -11;
+                area.AxisY.ScaleView.Size = 22;
             }
             PlaceCursorInView();
             PlaceRangeInView();
@@ -347,10 +353,10 @@ namespace Test
                 minY = 0; maxY = 1;
             }
             double ySpan = Math.Max(maxY - minY, 1);
-            double padY = ySpan * 0.1;
-            // 上下对称留 10%（0 以下可见，不强制贴底）
-            area.AxisY.ScaleView.Position = minY - padY;
-            area.AxisY.ScaleView.Size = ySpan + padY * 2 + 1;
+            // 0 中轴对称显示（0 在中间，上下对称 10% 留白）
+            double half = ZeroCenterHalf(minY, maxY);
+            area.AxisY.ScaleView.Position = -half;
+            area.AxisY.ScaleView.Size = half * 2 + 1;
             SyncRangeRect();
             UpdatePageLabel();
         }
@@ -393,8 +399,9 @@ namespace Test
                     if (ev.Step > maxY) maxY = ev.Step;
                 }
                 double ySpan = Math.Max(maxY - minY, 1);
-                area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
-                area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+                double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
+                area.AxisY.ScaleView.Position = -half;
+                area.AxisY.ScaleView.Size = half * 2 + 1;
                 _followTail = false;
                 UpdatePageLabel();
                 SyncRangeRect();
@@ -534,14 +541,14 @@ namespace Test
                 if (ev.Step > maxY) maxY = ev.Step;
             }
             if (minY == short.MaxValue) return;
-            double span = Math.Max(maxY - minY, 1);
-            // 上方 20% 越界防护（防拖拽漂移把曲线压到顶部）；下方放开 20% 越界（0 以下可见）
-            double lo = minY - span * 0.2;
-            double hi = maxY + span * 0.2;
+            // 0 中轴对称 clamp：范围 [-1.2M, 1.2M]（M = 数据最大绝对值，防漂移/防曲线消失）
+            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
+            double lo = -m * 1.2;
+            double hi = m * 1.2;
             if (view.Size >= hi - lo)
             {
-                // 视口已覆盖全部数据（缩小过多）：锁底，不做平移（防拖不动）
-                view.Position = lo;
+                // 视口已覆盖全部数据（缩小过多）：锁中轴，不做平移（防拖不动）
+                view.Position = -m;
                 return;
             }
             if (view.Position < lo) view.Position = lo;

@@ -9,6 +9,12 @@ namespace Test
 {
     public partial class Frm_MultiTrend : Form
     {
+        /// <summary>Y 轴 0 中轴对称范围（half = 数据最大绝对值 ×1.1 留白，0 在中间）</summary>
+        private static double ZeroCenterHalf(short minY, short maxY)
+        {
+            double m = Math.Max(Math.Max(Math.Abs((double)minY), Math.Abs((double)maxY)), 1);
+            return m * 1.1;
+        }
         private readonly List<StepEvent> _data;
         private readonly Dictionary<int, List<StepEvent>> _byStation;   // 每工位时间有序事件
         private readonly Timer _timer;
@@ -19,6 +25,7 @@ namespace Test
         private bool _isPanning;
         private Point _panStart;
         private double _panViewStart, _panYViewStart, _panYSizeStart;
+        private int _panPlotHeight = 1;                  // 绘图区像素高度（Y 拖拽灵敏度基准）
         private string _highlightName;                                  // 高亮工位（Series 名）
 
         public Frm_MultiTrend()
@@ -64,8 +71,7 @@ namespace Test
             area.AxisY.Title = "步号";
             area.AxisX.LabelStyle.Format = "HH:mm:ss.fff";
             area.AxisY.IsStartedFromZero = false;
-            area.AxisY.IntervalAutoMode = IntervalAutoMode.FixedCount;   // 固定刻度数量
-            area.AxisY.Interval = 6;
+            // 自动刻度：步进随视野缩放自动变化
             area.AxisX.ScaleView.Zoomable = true;
             area.AxisY.ScaleView.Zoomable = true;
             area.CursorX.IsUserEnabled = true;
@@ -241,8 +247,9 @@ namespace Test
             if (gMinY != short.MaxValue)
             {
                 double span = Math.Max(gMaxY - gMinY, 1);
-                chart1.ChartAreas[0].AxisY.ScaleView.Position = gMinY - span * 0.1;
-                chart1.ChartAreas[0].AxisY.ScaleView.Size = span * 1.2 + 1;
+                double half = ZeroCenterHalf(gMinY, gMaxY);   // 0 中轴对称
+                chart1.ChartAreas[0].AxisY.ScaleView.Position = -half;
+                chart1.ChartAreas[0].AxisY.ScaleView.Size = half * 2 + 1;
             }
             if (gStart != double.MaxValue)
             {
@@ -334,8 +341,9 @@ namespace Test
             }
             if (minY == short.MaxValue) return;
             double ySpan = Math.Max(maxY - minY, 1);
-            area.AxisY.ScaleView.Position = minY - ySpan * 0.1;
-            area.AxisY.ScaleView.Size = ySpan * 1.2 + 1;
+            double half = ZeroCenterHalf(minY, maxY);   // 0 中轴对称
+            area.AxisY.ScaleView.Position = -half;
+            area.AxisY.ScaleView.Size = half * 2 + 1;
             area.AxisX.ScaleView.Position = gStart;
             area.AxisX.ScaleView.Size = Math.Max(gEnd - gStart, 0.5 / 86400000.0);
         }
@@ -393,6 +401,7 @@ namespace Test
             if (!plotRect.Contains(e.Location)) return;
             _isPanning = true;
             _panStart = e.Location;
+            _panPlotHeight = plotRect.Height;   // 绘图区实际像素高度（Y 拖拽灵敏度基准）
             _panViewStart = ca.AxisX.ScaleView.Position;
             var viewY = ca.AxisY.ScaleView;
             _panYViewStart = double.IsNaN(viewY.Position) ? ca.AxisY.Minimum : viewY.Position;
@@ -422,10 +431,13 @@ namespace Test
             var area = chart1.ChartAreas[0];
             double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
             area.AxisX.ScaleView.Position = _panViewStart + dx;
-            double dy = (e.Y - _panStart.Y) / (double)chart1.Height * _panYSizeStart;
+            double dy = (e.Y - _panStart.Y) / (double)Math.Max(_panPlotHeight, 1) * _panYSizeStart;
             area.AxisY.ScaleView.Position = _panYViewStart + dy;
             area.AxisY.ScaleView.Size = _panYSizeStart;
             ClampView();
+            // 同步拖拽基准（clamp 后 Position 可能被调整——不同步会导致回拖时跳回旧值"反弹"）
+            _panViewStart = area.AxisX.ScaleView.Position;
+            _panYViewStart = area.AxisY.ScaleView.Position;
         }
 
         /// <summary>视图 clamp：不滑出数据范围（左右）</summary>

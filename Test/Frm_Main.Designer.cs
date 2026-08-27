@@ -170,12 +170,12 @@ namespace Test
             this.btnToggleMode.UseVisualStyleBackColor = true;
             this.btnToggleMode.Click += new System.EventHandler(btnToggleMode_Click);
             this.lblRecordPrefix.AutoSize = true;
-            this.lblRecordPrefix.Location = new System.Drawing.Point(320, 52);
+            this.lblRecordPrefix.Location = new System.Drawing.Point(660, 26);
             this.lblRecordPrefix.Name = "lblRecordPrefix";
             this.lblRecordPrefix.Size = new System.Drawing.Size(50, 16);
             this.lblRecordPrefix.TabIndex = 15;
             this.lblRecordPrefix.Text = "记录名";
-            this.txtRecordPrefix.Location = new System.Drawing.Point(374, 49);
+            this.txtRecordPrefix.Location = new System.Drawing.Point(714, 23);
             this.txtRecordPrefix.Name = "txtRecordPrefix";
             this.txtRecordPrefix.Size = new System.Drawing.Size(120, 23);
             this.txtRecordPrefix.TabIndex = 16;
