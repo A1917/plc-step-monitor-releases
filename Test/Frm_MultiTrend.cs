@@ -442,16 +442,14 @@ namespace Test
                 SyncRangeRect();
             }
             if (!_isPanning) return;
-            var area = chart1.ChartAreas[0];
-            double dx = -(e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
-            area.AxisX.ScaleView.Position = _panViewStart + dx;
+            var view = chart1.ChartAreas[0];
+            double dx = -(e.X - _panStart.X) / (double)chart1.Width * view.AxisX.ScaleView.Size;
+            view.AxisX.ScaleView.Position = _panViewStart + dx;
             double dy = (e.Y - _panStart.Y) / (double)Math.Max(_panPlotHeight, 1) * _panYSizeStart;
-            area.AxisY.ScaleView.Position = _panYViewStart + dy;
-            area.AxisY.ScaleView.Size = _panYSizeStart;
+            view.AxisY.ScaleView.Position = _panYViewStart + dy;
+            view.AxisY.ScaleView.Size = _panYSizeStart;
             ClampView();
-            // 同步拖拽基准（clamp 后 Position 可能被调整——不同步会导致回拖时跳回旧值"反弹"）
-            _panViewStart = area.AxisX.ScaleView.Position;
-            _panYViewStart = area.AxisY.ScaleView.Position;
+            // 注意：不更新 _panViewStart/_panYViewStart——基准保持拖拽开始值（防增量累积导致视图自走）
         }
 
         /// <summary>视图 clamp：不滑出数据范围（左右）</summary>

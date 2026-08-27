@@ -789,9 +789,8 @@ namespace Test
                 ClampToNow();   // 右端不超当前时间（防拖出空白）
                 ClampYAxis();   // Y 轴不拖出数据范围（防曲线消失）
                 UpdateYTicks();   // 刻度步进/0 基准随视野更新
-                // 同步拖拽基准（clamp 后 Position 可能被调整——不同步会导致回拖时跳回旧值"反弹"）
-                _panViewStart = area.AxisX.ScaleView.Position;
-                _panYViewStart = area.AxisY.ScaleView.Position;
+                // 注意：不更新 _panViewStart/_panYViewStart——基准保持拖拽开始值（绝对位移模型，
+                // 鼠标不动视图不动；若同步基准会变成增量累积，鼠标微抖/浮点误差导致视图自走）
                 SyncRangeRect();
                 UpdatePageLabel();
                 return;
