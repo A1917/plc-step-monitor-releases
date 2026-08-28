@@ -222,7 +222,8 @@ namespace Test
             if (_followTail && dataActive)
             {
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                view.Position = DateTime.Now.ToOADate() - view.Size;
+                if (!double.IsNaN(view.Size) && view.Size > 0)
+                    view.Position = DateTime.Now.ToOADate() - view.Size;
             }
         }
 

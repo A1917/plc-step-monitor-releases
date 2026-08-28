@@ -111,7 +111,7 @@ namespace Test
                     File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));
 
                     progress.SetProgress(100, "即将重启...");
-                    Thread.Sleep(500);
+                    Application.DoEvents();   // 刷新 UI，不阻塞线程
 
                     Process.Start(new ProcessStartInfo
                     {
