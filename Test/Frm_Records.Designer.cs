@@ -78,7 +78,7 @@ namespace Test
             this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.panelBottom.Location = new System.Drawing.Point(0, 425);
             this.panelBottom.Name = "panelBottom";
-            this.panelBottom.Size = new System.Drawing.Size(800, 70);
+            this.panelBottom.Size = new System.Drawing.Size(800, 90);   // 加高到两行
             this.panelBottom.TabIndex = 1;
             this.btnPrev.Location = new System.Drawing.Point(12, 8);
             this.btnPrev.Name = "btnPrev";
@@ -120,9 +120,9 @@ namespace Test
             this.chkLockRange.Text = "锁定";
             this.chkLockRange.UseVisualStyleBackColor = true;
             this.lblCursorInfo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.lblCursorInfo.Location = new System.Drawing.Point(12, 36);
+            this.lblCursorInfo.Location = new System.Drawing.Point(12, 40);
             this.lblCursorInfo.Name = "lblCursorInfo";
-            this.lblCursorInfo.Size = new System.Drawing.Size(776, 24);
+            this.lblCursorInfo.Size = new System.Drawing.Size(500, 24);
             this.lblCursorInfo.TabIndex = 5;
             this.lblCursorInfo.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             this.lblCursorInfo.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
@@ -145,7 +145,7 @@ namespace Test
             this.btnFit.TabIndex = 8;
             this.btnFit.Text = "适应";
             this.btnFit.UseVisualStyleBackColor = true;
-            this.btnLoad.Location = new System.Drawing.Point(620, 7);
+            this.btnLoad.Location = new System.Drawing.Point(520, 38);
             this.btnLoad.Name = "btnLoad";
             this.btnLoad.Size = new System.Drawing.Size(60, 25);
             this.btnLoad.TabIndex = 9;
@@ -154,14 +154,14 @@ namespace Test
             this.cmbRefresh.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbRefresh.FormattingEnabled = true;
             this.cmbRefresh.Items.AddRange(new object[] { "60fps", "30fps", "10fps" });
-            this.cmbRefresh.Location = new System.Drawing.Point(690, 7);
+            this.cmbRefresh.Location = new System.Drawing.Point(590, 40);
             this.cmbRefresh.Name = "cmbRefresh";
             this.cmbRefresh.Size = new System.Drawing.Size(90, 23);
             this.cmbRefresh.TabIndex = 10;
             this.cmbRefresh.SelectedIndex = 0;   // 默认 60fps（全局）
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            base.ClientSize = new System.Drawing.Size(800, 495);
+            base.ClientSize = new System.Drawing.Size(800, 515);
             base.Controls.Add(this.chart1);
             base.Controls.Add(this.panelBottom);
             base.Name = "Frm_Records";

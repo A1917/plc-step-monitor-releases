@@ -267,6 +267,10 @@ namespace Test
                             UpdateChecker.DownloadAndApply(url, tag);
                         }
                     }
+                    else if (tag == null && url == null)
+                    {
+                        // 版本相同，不提示
+                    }
                     else if (tag == null)
                     {
                         MessageBox.Show("检查更新失败：网络异常或 GitHub 不可达", "更新错误",
@@ -274,8 +278,7 @@ namespace Test
                     }
                     else
                     {
-                        MessageBox.Show("当前已是最新版本 " + tag, "无需更新",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // 已是最新版本也不弹窗（用户要求）
                     }
                 });
             });

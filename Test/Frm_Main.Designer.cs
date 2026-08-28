@@ -103,7 +103,7 @@ namespace Test
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Margin = new System.Windows.Forms.Padding(4);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(1336, 53);
+            this.panel1.Size = new System.Drawing.Size(1336, 80);   // 加高放第二行
             this.panel1.TabIndex = 4;
             this.lbl_MachineState.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
             this.lbl_MachineState.Location = new System.Drawing.Point(938, 19);
@@ -180,12 +180,12 @@ namespace Test
             this.btnCheckUpdate.UseVisualStyleBackColor = true;
             this.btnCheckUpdate.Click += new System.EventHandler(btnCheckUpdate_Click);
             this.lblRecordPrefix.AutoSize = true;
-            this.lblRecordPrefix.Location = new System.Drawing.Point(660, 26);
+            this.lblRecordPrefix.Location = new System.Drawing.Point(320, 55);
             this.lblRecordPrefix.Name = "lblRecordPrefix";
             this.lblRecordPrefix.Size = new System.Drawing.Size(50, 16);
             this.lblRecordPrefix.TabIndex = 15;
             this.lblRecordPrefix.Text = "记录名";
-            this.txtRecordPrefix.Location = new System.Drawing.Point(714, 23);
+            this.txtRecordPrefix.Location = new System.Drawing.Point(374, 52);
             this.txtRecordPrefix.Name = "txtRecordPrefix";
             this.txtRecordPrefix.Size = new System.Drawing.Size(120, 23);
             this.txtRecordPrefix.TabIndex = 16;
