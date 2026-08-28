@@ -449,6 +449,7 @@ namespace Test
                         DateTime tail = DateTime.Now;
                         view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
                         ExtendCurrentStep();   // 曲线右端延伸当前步
+                        ClampYAxis();   // 防 ExtendCurrentStep 改变 Points 后 Y 轴自动重算漂移
                     }
                     return;
                 }
@@ -473,6 +474,7 @@ namespace Test
                         DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
                         view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
                         ExtendCurrentStep();   // 曲线右端延伸当前步
+                        ClampYAxis();   // 防 ExtendCurrentStep 改变 Points 后 Y 轴自动重算漂移
                     }
                 }
                 finally
@@ -487,23 +489,28 @@ namespace Test
             }
         }
 
-        /// <summary>跟随模式：曲线右端延伸一个"当前步"虚拟点（时间=现在，步号=最后事件步号）</summary>
+        /// <summary>跟随模式：曲线右端延伸"当前步"虚拟点（仅步号变化时重建，防周期重算导致Y轴大小振荡）</summary>
         private void ExtendCurrentStep()
         {
             if (_events.Count == 0)
             {
                 return;
             }
-            // 移除旧的虚拟点（Points 最后一点时间 > 最后事件时间 即虚拟点）
+            short step = _events[_events.Count - 1].Step;
+            // 步号未变且虚拟点已存在 → 跳过（避免每 100ms 删/加重绘触发 Y 轴自动重算）
             if (_series.Points.Count > 0)
             {
                 var last = _series.Points[_series.Points.Count - 1];
+                if (last.XValue > _lastPointTime.ToOADate() && (short)last.YValues[0] == step)
+                {
+                    return;
+                }
                 if (last.XValue > _lastPointTime.ToOADate())
                 {
-                    _series.Points.RemoveAt(_series.Points.Count - 1);
+                    _series.Points.RemoveAt(_series.Points.Count - 1);   // 移除旧虚拟点（步号变了才重建）
                 }
             }
-            _series.Points.AddXY(DateTime.Now, _events[_events.Count - 1].Step);
+            _series.Points.AddXY(DateTime.Now, step);
         }
 
         /// <summary>检测全局显示模式（实时/历史）切换，同步切换当前趋势图数据源</summary>
