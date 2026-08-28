@@ -174,7 +174,7 @@ namespace Test
             this.btnToggleMode.Click += new System.EventHandler(btnToggleMode_Click);
             this.btnCheckUpdate.Location = new System.Drawing.Point(640, 21);
             this.btnCheckUpdate.Name = "btnCheckUpdate";
-            this.btnCheckUpdate.Size = new System.Drawing.Size(80, 25);
+            this.btnCheckUpdate.Size = new System.Drawing.Size(90, 25);
             this.btnCheckUpdate.TabIndex = 18;
             this.btnCheckUpdate.Text = "检查更新";
             this.btnCheckUpdate.UseVisualStyleBackColor = true;

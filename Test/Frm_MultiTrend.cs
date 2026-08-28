@@ -438,7 +438,7 @@ namespace Test
             {
                 int layer = 0;
                 foreach (var p in placed) if (it.Left <= p.right + 4 && it.Right >= p.left - 4) layer = Math.Max(layer, p.layer + 1);
-                float y = it.BaseY + layer * 24;
+                float y = it.BaseY + layer * 30;   // 层间距 30px（防多工位标签重叠）
                 using (var bg = new SolidBrush(it.Color))
                 {
                     var rect = new RectangleF(it.Left, y, it.Right - it.Left, 20);
