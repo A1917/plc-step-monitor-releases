@@ -247,6 +247,40 @@ namespace Test
             }
         }
 
+        /// <summary>检查更新：从 GitHub Release 获取最新版本</summary>
+        private void btnCheckUpdate_Click(object sender, System.EventArgs e)
+        {
+            btnCheckUpdate.Enabled = false;
+            btnCheckUpdate.Text = "检查中...";
+            UpdateChecker.CheckAsync((hasUpdate, tag, url) =>
+            {
+                BeginInvoke((Action)delegate
+                {
+                    btnCheckUpdate.Enabled = true;
+                    btnCheckUpdate.Text = "检查更新";
+                    if (hasUpdate)
+                    {
+                        var result = MessageBox.Show("发现新版本 " + tag + "\n\n是否立即下载更新？",
+                            "更新可用", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                        if (result == DialogResult.Yes)
+                        {
+                            UpdateChecker.DownloadAndApply(url, tag);
+                        }
+                    }
+                    else if (tag == null)
+                    {
+                        MessageBox.Show("检查更新失败：网络异常或 GitHub 不可达", "更新错误",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show("当前已是最新版本 " + tag, "无需更新",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                });
+            });
+        }
+
         /// <summary>切换显示模式：实时 / 历史文件</summary>
         private void btnToggleMode_Click(object sender, System.EventArgs e)
         {

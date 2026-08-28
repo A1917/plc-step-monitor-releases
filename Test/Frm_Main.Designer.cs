@@ -21,6 +21,7 @@ namespace Test
         private Button btnLoadHistory;
         private Button btnMultiTrend;
         private Button btnToggleMode;
+        private Button btnCheckUpdate;
         private Label lblRecordPrefix;
         private TextBox txtRecordPrefix;
 
@@ -51,6 +52,7 @@ namespace Test
             this.btnLoadHistory = new System.Windows.Forms.Button();
             this.btnMultiTrend = new System.Windows.Forms.Button();
             this.btnToggleMode = new System.Windows.Forms.Button();
+            this.btnCheckUpdate = new System.Windows.Forms.Button();
             this.lblRecordPrefix = new System.Windows.Forms.Label();
             this.txtRecordPrefix = new System.Windows.Forms.TextBox();
             this.panel1.SuspendLayout();
@@ -83,6 +85,7 @@ namespace Test
             this.label1.Text = "心跳";
             this.panel1.Controls.Add(this.txtRecordPrefix);
             this.panel1.Controls.Add(this.lblRecordPrefix);
+            this.panel1.Controls.Add(this.btnCheckUpdate);
             this.panel1.Controls.Add(this.btnToggleMode);
             this.panel1.Controls.Add(this.btnMultiTrend);
             this.panel1.Controls.Add(this.btnLoadHistory);
@@ -169,6 +172,13 @@ namespace Test
             this.btnToggleMode.Text = "显示历史";
             this.btnToggleMode.UseVisualStyleBackColor = true;
             this.btnToggleMode.Click += new System.EventHandler(btnToggleMode_Click);
+            this.btnCheckUpdate.Location = new System.Drawing.Point(640, 21);
+            this.btnCheckUpdate.Name = "btnCheckUpdate";
+            this.btnCheckUpdate.Size = new System.Drawing.Size(80, 25);
+            this.btnCheckUpdate.TabIndex = 18;
+            this.btnCheckUpdate.Text = "检查更新";
+            this.btnCheckUpdate.UseVisualStyleBackColor = true;
+            this.btnCheckUpdate.Click += new System.EventHandler(btnCheckUpdate_Click);
             this.lblRecordPrefix.AutoSize = true;
             this.lblRecordPrefix.Location = new System.Drawing.Point(660, 26);
             this.lblRecordPrefix.Name = "lblRecordPrefix";
