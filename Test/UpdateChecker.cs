@@ -1,10 +1,10 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace Test
@@ -15,7 +15,7 @@ namespace Test
     public static class UpdateChecker
     {
         private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor-releases/releases/latest";
-        private static bool _checking;
+        private static volatile bool _checking;
 
         static UpdateChecker()
         {
@@ -26,36 +26,30 @@ namespace Test
         {
             if (_checking) { callback(false, null, "正在检查中..."); return; }
             _checking = true;
-            var bw = new BackgroundWorker();
-            bw.DoWork += (s, e) =>
+            ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
                     using (var wc = new WebClient())
                     {
+                        wc.Proxy = null;
                         wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
                         string json = wc.DownloadString(ApiUrl);
                         string tag = ExtractJsonValue(json, "tag_name");
                         string url = ExtractJsonValue(json, "browser_download_url");
                         string cur = "v" + Application.ProductVersion;
                         if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(url) && tag != cur)
-                            e.Result = new Tuple<bool, string, string>(true, tag, url);
+                            callback(true, tag, url);
                         else
-                            e.Result = new Tuple<bool, string, string>(false, cur, null);
+                            callback(false, cur, null);
                     }
                 }
                 catch (Exception ex)
                 {
-                    e.Result = new Tuple<bool, string, string>(false, null, "网络异常：" + ex.Message);
+                    callback(false, null, "网络异常：" + ex.Message);
                 }
-            };
-            bw.RunWorkerCompleted += (s, e) =>
-            {
-                _checking = false;
-                var r = (Tuple<bool, string, string>)e.Result;
-                callback(r.Item1, r.Item2, r.Item3);
-            };
-            bw.RunWorkerAsync();
+                finally { _checking = false; }
+            });
         }
 
         public static void DownloadAndApply(string downloadUrl, string versionTag)
@@ -69,6 +63,7 @@ namespace Test
                 Directory.CreateDirectory(tempDir);
                 using (var wc = new WebClient())
                 {
+                    wc.Proxy = null;
                     wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
                     wc.DownloadFile(downloadUrl, zipPath);
                 }
