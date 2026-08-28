@@ -122,7 +122,7 @@ namespace Test
                 for (int i = 0; i < chkStations.Items.Count; i++) chkStations.SetItemChecked(i, !all);
                 RebuildSeries();
             };
-            btnFit.Click += (s, e) => FitData();
+            btnFit.Click += (s, e) => FitToData();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(1);
             nudPageSec.ValueChanged += (s, e) =>
@@ -201,6 +201,8 @@ namespace Test
         private void RefreshRealtime()
         {
             if (_stations.Count == 0) return;
+            CheckModeChange();
+            if (!_useRealtime) return;
             bool dataActive = PlcData.IsConnected || Simulator.IsRunning;
             bool changed = false;
             foreach (int st in _stations)
@@ -223,7 +225,9 @@ namespace Test
             {
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
                 if (!double.IsNaN(view.Size) && view.Size > 0)
-                    view.Position = DateTime.Now.ToOADate() - view.Size;
+                    view.Position = ViewTailOADate() - view.Size;
+                ExtendCurrentStep();
+                ClampYAxis();
             }
         }
 
@@ -270,7 +274,8 @@ namespace Test
             double newY = Math.Max(ySize * factor, 1.0);
             vy.Position = mouseY - (mouseY - yPos) * (newY / ySize); vy.Size = newY;
             _followTail = false;
-            ClampView();
+            ClampToNow();
+            ClampYAxis();
             UpdateYTicks();
         }
 
@@ -280,7 +285,7 @@ namespace Test
             if (hit.ChartElementType == ChartElementType.Annotation && hit.Object is VerticalLineAnnotation va)
             {
                 double x = va.X; var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                if (x < view.Position || x > view.Position + view.Size) { view.Position = x - PageSizeDays / 2; _followTail = false; ClampView(); UpdatePageLabel(); }
+                if (x < view.Position || x > view.Position + view.Size) { view.Position = x - PageSizeDays / 2; _followTail = false; ClampToNow(); ClampYAxis(); UpdatePageLabel(); }
                 return;
             }
             var ca = chart1.ChartAreas[0]; var outer = ca.Position; var inner = ca.InnerPlotPosition;
@@ -307,7 +312,7 @@ namespace Test
             area.AxisX.ScaleView.Position = _panViewStart - (e.X - _panStart.X) / (double)chart1.Width * area.AxisX.ScaleView.Size;
             area.AxisY.ScaleView.Position = _panYViewStart + (e.Y - _panStart.Y) / (double)Math.Max(_panPlotHeight, 1) * _panYSizeStart;
             area.AxisY.ScaleView.Size = _panYSizeStart;
-            _followTail = false; ClampView(); UpdateYTicks(); UpdatePageLabel();
+            _followTail = false; ClampToNow(); ClampYAxis(); UpdateYTicks(); UpdatePageLabel();
         }
 
         private void ClampView()
@@ -387,6 +392,137 @@ namespace Test
 
         private int GetStationFromSeries(Series s) { if (s == null) return -1; string n = s.Name; if (n.StartsWith("工位 ")) return int.TryParse(n.Substring(3), out var st) ? st : -1; return -1; }
 
+        // ══════════════════════ 补齐功能（从 Frm_Records 移植） ══════════════════════
+
+        private double ViewTailOADate()
+        {
+            bool dataActive = PlcData.IsConnected || Simulator.IsRunning;
+            if (dataActive) return DateTime.Now.ToOADate();
+            return _data.Count > 0 ? _data[_data.Count - 1].Time.ToOADate() : DateTime.Now.ToOADate();
+        }
+
+        private void ExtendCurrentStep()
+        {
+            if (_data.Count == 0) return;
+            double now = DateTime.Now.ToOADate();
+            foreach (int st in _stations)
+            {
+                var ser = chart1.Series.FirstOrDefault(s => s.Name == "工位 " + st);
+                if (ser == null || ser.Points.Count == 0) continue;
+                short step = _byStation.TryGetValue(st, out var list) && list.Count > 0 ? list[list.Count - 1].Step : (short)-1;
+                if (step < 0) continue;
+                var last = ser.Points[ser.Points.Count - 1];
+                if (last.XValue > ViewTailOADate() - 0.0001) { last.SetValueXY(now, step); }
+                else ser.Points.AddXY(now, step);
+            }
+        }
+
+        private void ClampToNow()
+        {
+            if (_data.Count == 0) return;
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            double tail = ViewTailOADate();
+            double dataStart = _data[0].Time.ToOADate();
+            if (view.Size >= tail - dataStart) { view.Position = tail - view.Size; return; }
+            if (view.Position < dataStart - 0.0001) view.Position = dataStart;
+            if (view.Position + view.Size > tail + 0.0001) view.Position = tail - view.Size;
+        }
+
+        private void ClampYAxis()
+        {
+            if (chart1.Series.Count == 0) return;
+            var view = chart1.ChartAreas[0].AxisY.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            short minY = short.MaxValue, maxY = short.MinValue;
+            foreach (int st in _stations)
+            {
+                if (!_byStation.TryGetValue(st, out var list) || list.Count == 0) continue;
+                foreach (var ev in list) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
+            }
+            if (minY == short.MaxValue) return;
+            double span = Math.Max(maxY - minY, 1);
+            double lo = minY - span * 0.2, hi = maxY + span * 0.2;
+            if (view.Size >= hi - lo) { view.Position = lo; return; }
+            if (view.Position < lo) view.Position = lo;
+            if (view.Position + view.Size > hi) view.Position = hi - view.Size;
+        }
+
+        private void CheckModeChange()
+        {
+            bool nowHistory = EventStore.HistoryMode && EventStore.LoadedHistory != null;
+            if (nowHistory == !_useRealtime) return;
+            if (nowHistory) { _data = EventStore.LoadedHistory; _useRealtime = false; _followTail = false; }
+            else { _data = new List<StepEvent>(); _useRealtime = true; _followTail = true; _lastPointTime = DateTime.MinValue; }
+            _byStation = _data.GroupBy(e => e.Station).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Time).ToList());
+            RebuildSeries();
+        }
+
+        private void FitToData()
+        {
+            if (_data.Count == 0) return;
+            var area = chart1.ChartAreas[0];
+            area.AxisX.ScaleView.Position = _data[0].Time.ToOADate();
+            area.AxisX.ScaleView.Size = PageSizeDays;
+            if (_data.Count > 0) area.AxisX.ScaleView.Position = _data[_data.Count - 1].Time.ToOADate() - PageSizeDays;
+            FitWindow();
+        }
+
+        private void FitWindow()
+        {
+            if (_data.Count == 0) { chart1.ChartAreas[0].AxisY.ScaleView.Position = 0; chart1.ChartAreas[0].AxisY.ScaleView.Size = 10; return; }
+            short minY = short.MaxValue, maxY = short.MinValue;
+            foreach (int st in _stations)
+            {
+                if (!_byStation.TryGetValue(st, out var list)) continue;
+                foreach (var ev in list) { if (ev.Step < minY) minY = ev.Step; if (ev.Step > maxY) maxY = ev.Step; }
+            }
+            if (minY == short.MaxValue) return;
+            double span = Math.Max(maxY - minY, 1);
+            chart1.ChartAreas[0].AxisY.ScaleView.Position = minY - span * 0.1;
+            chart1.ChartAreas[0].AxisY.ScaleView.Size = span * 1.2 + 1;
+            UpdateYTicks(); UpdatePageLabel();
+        }
+
+        private void LoadHistory()
+        {
+            using (var dlg = new OpenFileDialog { Title = "选择历史记录文件", Filter = "CSV 文件|*.csv|所有文件|*.*", Multiselect = true, InitialDirectory = RecordStore.RecordsDir })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var all = new List<StepEvent>();
+                foreach (string f in dlg.FileNames) all.AddRange(RecordStore.Load(f));
+                if (all.Count == 0) return;
+                all.Sort((a, b) => a.Time.CompareTo(b.Time));
+                _data = all; _useRealtime = false; _followTail = false;
+                _byStation = _data.GroupBy(e => e.Station).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Time).ToList());
+                RebuildSeries();
+                FitToData();
+            }
+        }
+
+        private void DrawRangeDuration(Graphics g, ChartArea area)
+        {
+            if (!chkRange.Checked || double.IsNaN(_curStart.X) || double.IsNaN(_curEnd.X)) return;
+            try
+            {
+                double durMs = Math.Abs(_curEnd.X - _curStart.X) * 86400000.0;
+                string text = durMs.ToString("F0") + " ms";
+                double x1 = Math.Min(_curStart.X, _curEnd.X), x2 = Math.Max(_curStart.X, _curEnd.X);
+                double midX = (x1 + x2) / 2;
+                float xPix = (float)area.AxisX.ValueToPixelPosition(midX);
+                float topPix = (float)(area.Position.Y / 100 * chart1.Height + 2);
+                using (var bg = new SolidBrush(Color.FromArgb(180, 25, 25, 112)))
+                using (var font = new Font("微软雅黑", 9f))
+                {
+                    SizeF sz = g.MeasureString(text, font);
+                    var rect = new RectangleF(xPix - sz.Width / 2 - 4, topPix, sz.Width + 8, sz.Height + 4);
+                    g.FillRectangle(bg, rect);
+                    g.DrawString(text, font, Brushes.White, rect.X + 4, rect.Y + 2);
+                }
+            }
+            catch { }
+        }
+
         // ══════════════════════════════════════════════ 步号标签自绘 ══════════════════════════════════════════════
 
         private void OnChartPaint(object sender, PaintEventArgs e)
@@ -410,6 +546,7 @@ namespace Test
                     if (!double.IsNaN(_curEnd.X)) foreach (int st in _stations) { short s = StepAt(st, SafeFromOADate(_curEnd.X)); if (s >= 0) tags.Add(new TagItem(_curEnd.X, st + ":" + s, Color.DeepSkyBlue, -1)); }
                 }
                 if (tags.Count > 0) DrawStepTags(e.Graphics, area, tags);
+                DrawRangeDuration(e.Graphics, area);
             }
             catch { }
         }
