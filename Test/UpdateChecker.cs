@@ -9,9 +9,6 @@ using System.Windows.Forms;
 
 namespace Test
 {
-    /// <summary>
-    /// 自动更新：从公开仓库 GitHub Release 检查/下载/替换/重启。
-    /// </summary>
     public static class UpdateChecker
     {
         private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor-releases/releases/latest";
@@ -52,52 +49,65 @@ namespace Test
             });
         }
 
-        public static void DownloadAndApply(string downloadUrl, string versionTag)
+        public static void DownloadAndApplyAsync(string downloadUrl, string versionTag, Frm_UpdateProgress progress)
         {
-            string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
-            string tempDir = Path.Combine(Path.GetTempPath(), "PLCStepUpdate_" + versionTag);
-            string zipPath = Path.Combine(tempDir, "update.zip");
-
-            try
+            ThreadPool.QueueUserWorkItem(_ =>
             {
-                Directory.CreateDirectory(tempDir);
-                using (var wc = new WebClient())
+                try
                 {
-                    wc.Proxy = null;
-                    wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
-                    wc.DownloadFile(downloadUrl, zipPath);
+                    string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
+                    string tempDir = Path.Combine(Path.GetTempPath(), "PLCStepUpdate_" + versionTag);
+                    string zipPath = Path.Combine(tempDir, "update.zip");
+
+                    progress.SetProgress(0, "正在下载...");
+                    Directory.CreateDirectory(tempDir);
+                    using (var wc = new WebClient())
+                    {
+                        wc.Proxy = null;
+                        wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
+                        wc.DownloadFile(downloadUrl, zipPath);
+                    }
+
+                    if (progress.Cancelled) return;
+                    progress.SetProgress(50, "正在解压...");
+
+                    string extractDir = Path.Combine(tempDir, "extracted");
+                    if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
+                    ZipFile.ExtractToDirectory(zipPath, extractDir);
+
+                    string newExe = Path.Combine(extractDir, "PLCStepMonitor", "Test.exe");
+                    if (!File.Exists(newExe)) newExe = Path.Combine(extractDir, "Test.exe");
+                    if (!File.Exists(newExe))
+                    {
+                        progress.SetProgress(0, "更新包中未找到 Test.exe");
+                        return;
+                    }
+
+                    if (progress.Cancelled) return;
+                    progress.SetProgress(90, "正在准备重启...");
+
+                    string batPath = Path.Combine(tempDir, "update.bat");
+                    string batContent =
+                        "@echo off\r\ntimeout /t 3 /nobreak >nul\r\n" +
+                        "copy /y \"" + newExe + "\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
+                        "start \"\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\ndel \"%~f0\"\r\n";
+                    File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));
+
+                    progress.SetProgress(100, "即将重启...");
+                    Thread.Sleep(500);
+
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe", Arguments = "/c \"" + batPath + "\"",
+                        CreateNoWindow = true, UseShellExecute = false
+                    });
+                    Application.Exit();
                 }
-
-                string extractDir = Path.Combine(tempDir, "extracted");
-                if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
-                ZipFile.ExtractToDirectory(zipPath, extractDir);
-
-                string newExe = Path.Combine(extractDir, "PLCStepMonitor", "Test.exe");
-                if (!File.Exists(newExe)) newExe = Path.Combine(extractDir, "Test.exe");
-                if (!File.Exists(newExe))
+                catch (Exception ex)
                 {
-                    MessageBox.Show("更新包中未找到 Test.exe", "更新失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    progress.SetProgress(0, "更新失败：" + ex.Message);
                 }
-
-                string batPath = Path.Combine(tempDir, "update.bat");
-                string batContent =
-                    "@echo off\r\ntimeout /t 3 /nobreak >nul\r\n" +
-                    "copy /y \"" + newExe + "\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
-                    "start \"\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\ndel \"%~f0\"\r\n";
-                File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));
-
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe", Arguments = "/c \"" + batPath + "\"",
-                    CreateNoWindow = true, UseShellExecute = false
-                });
-                Application.Exit();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("更新失败：" + ex.Message, "更新错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            });
         }
 
         private static string ExtractJsonValue(string json, string key)

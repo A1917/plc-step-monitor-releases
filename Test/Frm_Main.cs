@@ -264,7 +264,9 @@ namespace Test
                             "更新可用", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (result == DialogResult.Yes)
                         {
-                            UpdateChecker.DownloadAndApply(url, tag);
+                            var progress = new Frm_UpdateProgress();
+                            progress.Show();
+                            UpdateChecker.DownloadAndApplyAsync(url, tag, progress);
                         }
                     }
                     else if (tag == null && url == null)
