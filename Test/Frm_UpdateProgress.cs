@@ -4,6 +4,19 @@ namespace Test
 {
     public partial class Frm_UpdateProgress : Form
     {
+        public string DownloadUrl;
+        public string VersionTag;
+
+        public Frm_UpdateProgress()
+        {
+            InitializeComponent();
+            Load += (s, e) =>
+            {
+                progressBar.Style = ProgressBarStyle.Marquee;
+                UpdateChecker.DownloadAndApplyAsync(DownloadUrl, VersionTag, this);
+            };
+        }
+
         public void SetProgress(int percent, string status)
         {
             if (IsDisposed) return;
