@@ -10,11 +10,11 @@ using System.Windows.Forms;
 namespace Test
 {
     /// <summary>
-    /// 自动更新：从 GitHub Release 检查/下载/替换/重启。
+    /// 自动更新：从公开仓库 GitHub Release 检查/下载/替换/重启。
     /// </summary>
     public static class UpdateChecker
     {
-        private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor/releases/latest";
+        private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor-releases/releases/latest";
         private static bool _checking;
 
         static UpdateChecker()
@@ -31,16 +31,9 @@ namespace Test
             {
                 try
                 {
-                    string token = GetGitHubToken();
-                    if (string.IsNullOrEmpty(token))
-                    {
-                        e.Result = new Tuple<bool, string, string>(false, null, "未找到 GitHub 凭据\n请手动到 GitHub Releases 页面下载更新");
-                        return;
-                    }
                     using (var wc = new WebClient())
                     {
                         wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
-                        wc.Headers.Add(HttpRequestHeader.Authorization, "token " + token);
                         string json = wc.DownloadString(ApiUrl);
                         string tag = ExtractJsonValue(json, "tag_name");
                         string url = ExtractJsonValue(json, "browser_download_url");
@@ -77,9 +70,6 @@ namespace Test
                 using (var wc = new WebClient())
                 {
                     wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
-                    string token = GetGitHubToken();
-                    if (!string.IsNullOrEmpty(token))
-                        wc.Headers.Add(HttpRequestHeader.Authorization, "token " + token);
                     wc.DownloadFile(downloadUrl, zipPath);
                 }
 
@@ -113,34 +103,6 @@ namespace Test
             {
                 MessageBox.Show("更新失败：" + ex.Message, "更新错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private static string GetGitHubToken()
-        {
-            try
-            {
-                using (var p = new Process())
-                {
-                    p.StartInfo = new ProcessStartInfo
-                    {
-                        FileName = "git", Arguments = "credential fill",
-                        UseShellExecute = false, CreateNoWindow = true,
-                        RedirectStandardInput = true, RedirectStandardOutput = true
-                    };
-                    p.Start();
-                    p.StandardInput.WriteLine("protocol=https");
-                    p.StandardInput.WriteLine("host=github.com");
-                    p.StandardInput.WriteLine();
-                    p.StandardInput.Close();
-                    string output = p.StandardOutput.ReadToEnd();
-                    p.WaitForExit(5000);
-                    foreach (string line in output.Split('\n'))
-                        if (line.StartsWith("password="))
-                            return line.Substring(9).Trim();
-                }
-            }
-            catch { }
-            return null;
         }
 
         private static string ExtractJsonValue(string json, string key)
