@@ -115,13 +115,15 @@ namespace Test
                 _draggingWhich = -1;   // 松开：各线标签保持当前位置（独立记忆）
                 _lastRangeStart = _curStart.X;   // 刷新锁定联动基线
                 _lastRangeEnd = _curEnd.X;
-                // 实时数据活跃时：拖到最右端 → 进入跟随模式（保持当前窗口宽度，右端贴最新——不重置宽度防视野跳变）
+                // 实时数据活跃时：拖到最右端（当前时间）→ 进入跟随模式（保持当前窗口宽度，右端贴最新）
+                // 历史/断开数据不触发——松手保持当前位置，不重置窗口宽度
                 bool dataActive = PlcData.IsConnected || Simulator.IsRunning;
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                if (dataActive && _events.Count > 0 && view.Position + view.Size >= _lastPointTime.ToOADate())
+                double followTarget = dataActive ? DateTime.Now.ToOADate() : ViewTailOADate();
+                if (dataActive && _events.Count > 0 && view.Position + view.Size >= followTarget - 0.0001)
                 {
                     _followTail = true;
-                    view.Position = ViewTailOADate() - view.Size;   // 保持放大宽度，仅右端贴最新
+                    view.Position = followTarget - view.Size;   // 保持放大宽度，仅右端贴最新
                 }
             };
             chart1.MouseLeave += (s, e) =>
@@ -491,7 +493,7 @@ namespace Test
             }
         }
 
-        /// <summary>跟随模式：曲线右端延伸"当前步"虚拟点（仅步号变化时重建，防周期重算导致Y轴大小振荡）</summary>
+        /// <summary>跟随模式：曲线右端延伸"当前步"虚拟点（用 SetValueXY 更新，不删不加，不触发重算）</summary>
         private void ExtendCurrentStep()
         {
             if (_events.Count == 0)
@@ -499,19 +501,18 @@ namespace Test
                 return;
             }
             short step = _events[_events.Count - 1].Step;
-            // 步号未变且虚拟点已存在 → 跳过（避免每 100ms 删/加重绘触发 Y 轴自动重算）
+            double now = DateTime.Now.ToOADate();
             if (_series.Points.Count > 0)
             {
                 var last = _series.Points[_series.Points.Count - 1];
-                if (last.XValue > _lastPointTime.ToOADate() && (short)last.YValues[0] == step)
-                {
-                    return;
-                }
                 if (last.XValue > _lastPointTime.ToOADate())
                 {
-                    _series.Points.RemoveAt(_series.Points.Count - 1);   // 移除旧虚拟点（步号变了才重建）
+                    // 已有虚拟点：原地更新时间和步号（SetValueXY 不触发 Chart 重算，防大小振荡）
+                    last.SetValueXY(now, step);
+                    return;
                 }
             }
+            // 无虚拟点：新建
             _series.Points.AddXY(DateTime.Now, step);
         }
 

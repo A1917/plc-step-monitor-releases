@@ -15,55 +15,56 @@ namespace Test
     public static class UpdateChecker
     {
         private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor/releases/latest";
-        private const string UserAgent = "PLCStepMonitor-Updater/1.0";
+
+        static UpdateChecker()
+        {
+            // 全局启用 TLS 1.2 / 1.3（.NET 4.7.2 默认未启用，GitHub 要求）
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+        }
+
+        private static bool _checking;   // 防重复点击
 
         /// <summary>
-        /// 检查最新 Release（异步，防止阻塞 UI）。返回 (有新版本, 版本号, 下载URL)。
+        /// 检查最新 Release（异步）。回调：hasUpdate, versionTag, downloadUrl(或错误信息)。
         /// </summary>
         public static void CheckAsync(Action<bool, string, string> callback)
         {
-            var bw = new BackgroundWorker();
-            bw.DoWork += (s, e) =>
+            if (_checking)
             {
-                try
+                callback(false, null, "正在检查中，请稍候...");
+                return;
+            }
+            _checking = true;
+            using (var wc = new WebClient())
+            {
+                wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
+                wc.DownloadStringCompleted += (s, e) =>
                 {
-                    // .NET 4.7.2 需显式启用 TLS 1.2（GitHub API 强制要求）
-                    System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
-
-                    var req = WebRequest.CreateHttp(ApiUrl);
-                    req.UserAgent = UserAgent;
-                    req.Timeout = 15000;
-                    using (var resp = req.GetResponse())
-                    using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                    _checking = false;
+                    if (e.Error != null)
                     {
-                        string json = reader.ReadToEnd();
-                        // 简单解析 JSON（不依赖外部库）
+                        callback(false, null, "网络异常：" + e.Error.Message);
+                        return;
+                    }
+                    try
+                    {
+                        string json = e.Result;
                         string tag = ExtractJsonValue(json, "tag_name");
-                        // browser_download_url 可能出现在 assets 数组里（需要特殊处理）
                         string url = ExtractDownloadUrl(json);
                         string currentVer = "v" + Application.ProductVersion;
 
                         if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(url) && tag != currentVer)
-                        {
-                            e.Result = new Tuple<bool, string, string>(true, tag, url);
-                        }
+                            callback(true, tag, url);
                         else
-                        {
-                            e.Result = new Tuple<bool, string, string>(false, currentVer, null);
-                        }
+                            callback(false, currentVer, null);
                     }
-                }
-                catch (Exception ex)
-                {
-                    e.Result = new Tuple<bool, string, string>(false, null, ex.Message);
-                }
-            };
-            bw.RunWorkerCompleted += (s, e) =>
-            {
-                var result = (Tuple<bool, string, string>)e.Result;
-                callback(result.Item1, result.Item2, result.Item3);
-            };
-            bw.RunWorkerAsync();
+                    catch (Exception ex)
+                    {
+                        callback(false, null, "解析失败：" + ex.Message);
+                    }
+                };
+                wc.DownloadStringAsync(new Uri(ApiUrl));
+            }
         }
 
         /// <summary>
@@ -77,32 +78,25 @@ namespace Test
 
             try
             {
-                // 下载
                 Directory.CreateDirectory(tempDir);
                 using (var wc = new WebClient())
                 {
                     wc.DownloadFile(downloadUrl, zipPath);
                 }
 
-                // 解压
                 string extractDir = Path.Combine(tempDir, "extracted");
                 if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
                 ZipFile.ExtractToDirectory(zipPath, extractDir);
 
-                // 找新 exe
                 string newExe = Path.Combine(extractDir, "PLCStepMonitor", "Test.exe");
                 if (!File.Exists(newExe))
-                {
-                    // 兼容旧版 zip 结构（exe 可能直接在根目录）
                     newExe = Path.Combine(extractDir, "Test.exe");
-                    if (!File.Exists(newExe))
-                    {
-                        MessageBox.Show("更新包中未找到 Test.exe", "更新失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
+                if (!File.Exists(newExe))
+                {
+                    MessageBox.Show("更新包中未找到 Test.exe", "更新失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
-                // 写 bat 脚本：等待旧进程退出 → 复制新 exe → 启动 → 自删
                 string batPath = Path.Combine(tempDir, "update.bat");
                 string batContent =
                     "@echo off\r\n" +
@@ -110,9 +104,8 @@ namespace Test
                     "copy /y \"" + newExe + "\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
                     "start \"\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
                     "del \"%~f0\"\r\n";
-                File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));   // GBK 编码，cmd 兼容
+                File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));
 
-                // 启动 bat 并退出
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -129,21 +122,6 @@ namespace Test
             }
         }
 
-        /// <summary>从 Release JSON 中提取第一个 .zip 下载 URL（assets 数组里）</summary>
-        private static string ExtractDownloadUrl(string json)
-        {
-            // GitHub API 返回 assets 数组，每个 asset 有 browser_download_url
-            string search = "\"browser_download_url\":";
-            int idx = json.IndexOf(search);
-            if (idx < 0) return null;
-            idx += search.Length;
-            while (idx < json.Length && (json[idx] == ' ' || json[idx] == '"')) idx++;
-            int end = json.IndexOf('"', idx);
-            if (end < 0) return null;
-            return json.Substring(idx, end - idx);
-        }
-
-        /// <summary>从简单 JSON 中提取指定键的字符串值（限一层）</summary>
         private static string ExtractJsonValue(string json, string key)
         {
             string search = "\"" + key + "\":";
@@ -154,6 +132,11 @@ namespace Test
             int end = json.IndexOf('"', idx);
             if (end < 0) return null;
             return json.Substring(idx, end - idx);
+        }
+
+        private static string ExtractDownloadUrl(string json)
+        {
+            return ExtractJsonValue(json, "browser_download_url");
         }
     }
 }
