@@ -169,9 +169,9 @@ namespace Test
             };
 
             RebuildPoints();
-            if (EventStore.LoadedHistory != null)
+            if (EventStore.LoadedHistory != null && EventStore.HistoryMode)
             {
-                // 全局历史已加载：自动进入历史模式
+                // 全局历史已加载且处于历史模式：自动进入历史模式
                 var fileEvents = EventStore.LoadedHistory.FindAll(ev => ev.Station == _station);
                 if (fileEvents.Count > 0)
                 {
@@ -541,17 +541,18 @@ namespace Test
             }
             else
             {
-                // 历史 → 实时：恢复实时数据
-                _loadingFromFile = false;
-                _events.Clear();
-                _events.AddRange(EventStore.GetAll(_station));
-                if (_events.Count > 0)
+                // 历史 → 实时：恢复实时数据（GetAll 为空时保留原数据，防曲线消失）
+                var realtime = EventStore.GetAll(_station);
+                if (realtime.Count > 0)
                 {
+                    _loadingFromFile = false;
+                    _events.Clear();
+                    _events.AddRange(realtime);
                     _lastPointTime = _events[_events.Count - 1].Time;
+                    RebuildPoints();
+                    FitWindow();
+                    Text = "工位 " + _station + " 实时趋势";
                 }
-                RebuildPoints();
-                FitWindow();
-                Text = "工位 " + _station + " 实时趋势";
             }
         }
 

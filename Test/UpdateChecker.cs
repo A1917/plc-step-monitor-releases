@@ -27,6 +27,9 @@ namespace Test
             {
                 try
                 {
+                    // .NET 4.7.2 需显式启用 TLS 1.2（GitHub API 强制要求）
+                    System.Net.ServicePointManager.SecurityProtocol = System.Net.SecurityProtocolType.Tls12;
+
                     var req = WebRequest.CreateHttp(ApiUrl);
                     req.UserAgent = UserAgent;
                     req.Timeout = 15000;
@@ -36,7 +39,8 @@ namespace Test
                         string json = reader.ReadToEnd();
                         // 简单解析 JSON（不依赖外部库）
                         string tag = ExtractJsonValue(json, "tag_name");
-                        string url = ExtractJsonValue(json, "browser_download_url");
+                        // browser_download_url 可能出现在 assets 数组里（需要特殊处理）
+                        string url = ExtractDownloadUrl(json);
                         string currentVer = "v" + Application.ProductVersion;
 
                         if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(url) && tag != currentVer)
@@ -123,6 +127,20 @@ namespace Test
             {
                 MessageBox.Show("更新失败：" + ex.Message, "更新错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        /// <summary>从 Release JSON 中提取第一个 .zip 下载 URL（assets 数组里）</summary>
+        private static string ExtractDownloadUrl(string json)
+        {
+            // GitHub API 返回 assets 数组，每个 asset 有 browser_download_url
+            string search = "\"browser_download_url\":";
+            int idx = json.IndexOf(search);
+            if (idx < 0) return null;
+            idx += search.Length;
+            while (idx < json.Length && (json[idx] == ' ' || json[idx] == '"')) idx++;
+            int end = json.IndexOf('"', idx);
+            if (end < 0) return null;
+            return json.Substring(idx, end - idx);
         }
 
         /// <summary>从简单 JSON 中提取指定键的字符串值（限一层）</summary>
