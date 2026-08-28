@@ -56,9 +56,23 @@ namespace Test
             wc.Proxy = null;
             wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
 
+            long totalBytes = 0;
+            long lastBytes = 0;
+            DateTime lastTime = DateTime.Now;
+
             wc.DownloadProgressChanged += (s, e) =>
             {
-                progress.SetProgress(-1, "下载中... " + FormatSize(e.BytesReceived));
+                totalBytes = e.TotalBytesToReceive;
+                double now = DateTime.Now.Ticks / 1e7;
+                double elapsed = now - (lastTime.Ticks / 1e7);
+                if (elapsed > 0.5)
+                {
+                    long speed = (long)((e.BytesReceived - lastBytes) / elapsed);
+                    lastBytes = e.BytesReceived;
+                    lastTime = DateTime.Now;
+                    int pct = totalBytes > 0 ? (int)(e.BytesReceived * 100 / totalBytes) : 0;
+                    progress.SetProgress(pct, "下载 " + FormatSize(e.BytesReceived) + " / " + FormatSize(totalBytes) + "  " + FormatSize(speed) + "/s");
+                }
             };
 
             wc.DownloadFileCompleted += (s, e) =>
