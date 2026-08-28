@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -51,26 +52,44 @@ namespace Test
 
         public static void DownloadAndApplyAsync(string downloadUrl, string versionTag, Frm_UpdateProgress progress)
         {
-            ThreadPool.QueueUserWorkItem(_ =>
+            var wc = new WebClient();
+            wc.Proxy = null;
+            wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
+
+            long totalBytes = 0;
+            long lastBytes = 0;
+            DateTime lastTime = DateTime.Now;
+
+            wc.DownloadProgressChanged += (s, e) =>
             {
+                totalBytes = e.TotalBytesToReceive;
+                double now = DateTime.Now.Ticks / 1e7;
+                double elapsed = now - (lastTime.Ticks / 1e7);
+                if (elapsed > 0.5)
+                {
+                    long speed = (long)((e.BytesReceived - lastBytes) / elapsed);
+                    lastBytes = e.BytesReceived;
+                    lastTime = DateTime.Now;
+                    int pct = totalBytes > 0 ? (int)(e.BytesReceived * 100 / totalBytes) : 0;
+                    progress.SetProgress(pct, "下载 " + FormatSize(e.BytesReceived) + " / " + FormatSize(totalBytes) + "  " + FormatSize(speed) + "/s");
+                }
+            };
+
+            wc.DownloadFileCompleted += (s, e) =>
+            {
+                wc.Dispose();
+                if (e.Cancelled || e.Error != null || progress.Cancelled)
+                {
+                    progress.SetProgress(0, e.Error != null ? "下载失败：" + e.Error.Message : "已取消");
+                    return;
+                }
                 try
                 {
                     string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
                     string tempDir = Path.Combine(Path.GetTempPath(), "PLCStepUpdate_" + versionTag);
                     string zipPath = Path.Combine(tempDir, "update.zip");
 
-                    progress.SetProgress(0, "正在下载...");
-                    Directory.CreateDirectory(tempDir);
-                    using (var wc = new WebClient())
-                    {
-                        wc.Proxy = null;
-                        wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
-                        wc.DownloadFile(downloadUrl, zipPath);
-                    }
-
-                    if (progress.Cancelled) return;
-                    progress.SetProgress(50, "正在解压...");
-
+                    progress.SetProgress(90, "正在解压...");
                     string extractDir = Path.Combine(tempDir, "extracted");
                     if (Directory.Exists(extractDir)) Directory.Delete(extractDir, true);
                     ZipFile.ExtractToDirectory(zipPath, extractDir);
@@ -83,9 +102,7 @@ namespace Test
                         return;
                     }
 
-                    if (progress.Cancelled) return;
-                    progress.SetProgress(90, "正在准备重启...");
-
+                    progress.SetProgress(99, "正在准备重启...");
                     string batPath = Path.Combine(tempDir, "update.bat");
                     string batContent =
                         "@echo off\r\ntimeout /t 3 /nobreak >nul\r\n" +
@@ -107,7 +124,19 @@ namespace Test
                 {
                     progress.SetProgress(0, "更新失败：" + ex.Message);
                 }
-            });
+            };
+
+            string tempDir2 = Path.Combine(Path.GetTempPath(), "PLCStepUpdate_" + versionTag);
+            Directory.CreateDirectory(tempDir2);
+            string zipPath2 = Path.Combine(tempDir2, "update.zip");
+            wc.DownloadFileAsync(new Uri(downloadUrl), zipPath2);
+        }
+
+        private static string FormatSize(long bytes)
+        {
+            if (bytes < 1024) return bytes + "B";
+            if (bytes < 1024 * 1024) return (bytes / 1024.0).ToString("F1") + "KB";
+            return (bytes / (1024.0 * 1024.0)).ToString("F1") + "MB";
         }
 
         private static string ExtractJsonValue(string json, string key)
