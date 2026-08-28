@@ -468,18 +468,20 @@ namespace Test
                         _series.Points.Clear();
                         foreach (var ev in _events) _series.Points.AddXY(ev.Time, ev.Step);
                     }
-                    if (_followTail && dataActive)
-                    {
-                        var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                        DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
-                        view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
-                        ExtendCurrentStep();   // 曲线右端延伸当前步
-                        ClampYAxis();   // 防 ExtendCurrentStep 改变 Points 后 Y 轴自动重算漂移
-                    }
                 }
                 finally
                 {
                     chart1.ResumeLayout();
+                }
+                // 跟随滚动在 ResumeLayout 后（防 SuspendLayout 期间 ExtendCurrentStep 改 Points 后
+                // ResumeLayout 重算布局导致 ScaleView 被重置——宽度/高度周期变化）
+                if (_followTail && dataActive)
+                {
+                    var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                    DateTime tail = _lastPointTime > DateTime.Now ? _lastPointTime : DateTime.Now;
+                    view.Position = tail.ToOADate() - view.Size;   // 保持当前窗口宽度（放大也跟随），仅右端贴最新
+                    ExtendCurrentStep();   // 曲线右端延伸当前步
+                    ClampYAxis();   // 防 ExtendCurrentStep 改变 Points 后 Y 轴自动重算漂移
                 }
                 UpdatePageLabel();
             }
