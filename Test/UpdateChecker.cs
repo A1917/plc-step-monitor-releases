@@ -15,61 +15,56 @@ namespace Test
     public static class UpdateChecker
     {
         private const string ApiUrl = "https://api.github.com/repos/A1917/plc-step-monitor/releases/latest";
+        private static bool _checking;
 
         static UpdateChecker()
         {
-            // 全局启用 TLS 1.2 / 1.3（.NET 4.7.2 默认未启用，GitHub 要求）
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
         }
 
-        private static bool _checking;   // 防重复点击
-
-        /// <summary>
-        /// 检查最新 Release（异步）。回调：hasUpdate, versionTag, downloadUrl(或错误信息)。
-        /// </summary>
         public static void CheckAsync(Action<bool, string, string> callback)
         {
-            if (_checking)
-            {
-                callback(false, null, "正在检查中，请稍候...");
-                return;
-            }
+            if (_checking) { callback(false, null, "正在检查中..."); return; }
             _checking = true;
-            using (var wc = new WebClient())
+            var bw = new BackgroundWorker();
+            bw.DoWork += (s, e) =>
             {
-                wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
-                wc.DownloadStringCompleted += (s, e) =>
+                try
                 {
-                    _checking = false;
-                    if (e.Error != null)
+                    string token = GetGitHubToken();
+                    if (string.IsNullOrEmpty(token))
                     {
-                        callback(false, null, "网络异常：" + e.Error.Message);
+                        e.Result = new Tuple<bool, string, string>(false, null, "未找到 GitHub 凭据\n请手动到 GitHub Releases 页面下载更新");
                         return;
                     }
-                    try
+                    using (var wc = new WebClient())
                     {
-                        string json = e.Result;
+                        wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
+                        wc.Headers.Add(HttpRequestHeader.Authorization, "token " + token);
+                        string json = wc.DownloadString(ApiUrl);
                         string tag = ExtractJsonValue(json, "tag_name");
-                        string url = ExtractDownloadUrl(json);
-                        string currentVer = "v" + Application.ProductVersion;
-
-                        if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(url) && tag != currentVer)
-                            callback(true, tag, url);
+                        string url = ExtractJsonValue(json, "browser_download_url");
+                        string cur = "v" + Application.ProductVersion;
+                        if (!string.IsNullOrEmpty(tag) && !string.IsNullOrEmpty(url) && tag != cur)
+                            e.Result = new Tuple<bool, string, string>(true, tag, url);
                         else
-                            callback(false, currentVer, null);
+                            e.Result = new Tuple<bool, string, string>(false, cur, null);
                     }
-                    catch (Exception ex)
-                    {
-                        callback(false, null, "解析失败：" + ex.Message);
-                    }
-                };
-                wc.DownloadStringAsync(new Uri(ApiUrl));
-            }
+                }
+                catch (Exception ex)
+                {
+                    e.Result = new Tuple<bool, string, string>(false, null, "网络异常：" + ex.Message);
+                }
+            };
+            bw.RunWorkerCompleted += (s, e) =>
+            {
+                _checking = false;
+                var r = (Tuple<bool, string, string>)e.Result;
+                callback(r.Item1, r.Item2, r.Item3);
+            };
+            bw.RunWorkerAsync();
         }
 
-        /// <summary>
-        /// 下载更新并执行替换 + 重启。
-        /// </summary>
         public static void DownloadAndApply(string downloadUrl, string versionTag)
         {
             string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
@@ -81,6 +76,10 @@ namespace Test
                 Directory.CreateDirectory(tempDir);
                 using (var wc = new WebClient())
                 {
+                    wc.Headers.Add(HttpRequestHeader.UserAgent, "PLCStepMonitor");
+                    string token = GetGitHubToken();
+                    if (!string.IsNullOrEmpty(token))
+                        wc.Headers.Add(HttpRequestHeader.Authorization, "token " + token);
                     wc.DownloadFile(downloadUrl, zipPath);
                 }
 
@@ -89,8 +88,7 @@ namespace Test
                 ZipFile.ExtractToDirectory(zipPath, extractDir);
 
                 string newExe = Path.Combine(extractDir, "PLCStepMonitor", "Test.exe");
-                if (!File.Exists(newExe))
-                    newExe = Path.Combine(extractDir, "Test.exe");
+                if (!File.Exists(newExe)) newExe = Path.Combine(extractDir, "Test.exe");
                 if (!File.Exists(newExe))
                 {
                     MessageBox.Show("更新包中未找到 Test.exe", "更新失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -99,21 +97,16 @@ namespace Test
 
                 string batPath = Path.Combine(tempDir, "update.bat");
                 string batContent =
-                    "@echo off\r\n" +
-                    "timeout /t 3 /nobreak >nul\r\n" +
+                    "@echo off\r\ntimeout /t 3 /nobreak >nul\r\n" +
                     "copy /y \"" + newExe + "\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
-                    "start \"\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\n" +
-                    "del \"%~f0\"\r\n";
+                    "start \"\" \"" + Path.Combine(exeDir, "Test.exe") + "\"\r\ndel \"%~f0\"\r\n";
                 File.WriteAllText(batPath, batContent, Encoding.GetEncoding(936));
 
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "cmd.exe",
-                    Arguments = "/c \"" + batPath + "\"",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
+                    FileName = "cmd.exe", Arguments = "/c \"" + batPath + "\"",
+                    CreateNoWindow = true, UseShellExecute = false
                 });
-
                 Application.Exit();
             }
             catch (Exception ex)
@@ -122,21 +115,43 @@ namespace Test
             }
         }
 
-        private static string ExtractJsonValue(string json, string key)
+        private static string GetGitHubToken()
         {
-            string search = "\"" + key + "\":";
-            int idx = json.IndexOf(search);
-            if (idx < 0) return null;
-            idx += search.Length;
-            while (idx < json.Length && (json[idx] == ' ' || json[idx] == '"')) idx++;
-            int end = json.IndexOf('"', idx);
-            if (end < 0) return null;
-            return json.Substring(idx, end - idx);
+            try
+            {
+                using (var p = new Process())
+                {
+                    p.StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "git", Arguments = "credential fill",
+                        UseShellExecute = false, CreateNoWindow = true,
+                        RedirectStandardInput = true, RedirectStandardOutput = true
+                    };
+                    p.Start();
+                    p.StandardInput.WriteLine("protocol=https");
+                    p.StandardInput.WriteLine("host=github.com");
+                    p.StandardInput.WriteLine();
+                    p.StandardInput.Close();
+                    string output = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(5000);
+                    foreach (string line in output.Split('\n'))
+                        if (line.StartsWith("password="))
+                            return line.Substring(9).Trim();
+                }
+            }
+            catch { }
+            return null;
         }
 
-        private static string ExtractDownloadUrl(string json)
+        private static string ExtractJsonValue(string json, string key)
         {
-            return ExtractJsonValue(json, "browser_download_url");
+            string s = "\"" + key + "\":";
+            int i = json.IndexOf(s);
+            if (i < 0) return null;
+            i += s.Length;
+            while (i < json.Length && (json[i] == ' ' || json[i] == '"')) i++;
+            int e = json.IndexOf('"', i);
+            return e < 0 ? null : json.Substring(i, e - i);
         }
     }
 }
