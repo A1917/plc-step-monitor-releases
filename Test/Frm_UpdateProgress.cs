@@ -11,6 +11,7 @@ namespace Test
             {
                 BeginInvoke((MethodInvoker)delegate
                 {
+                    if (IsDisposed || progressBar == null || lblStatus == null) return;
                     if (percent <= 0 || percent >= 100)
                     {
                         progressBar.Style = ProgressBarStyle.Marquee;
