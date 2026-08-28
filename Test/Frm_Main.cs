@@ -212,19 +212,20 @@ namespace Test
             }
         }
 
-        /// <summary>加载历史记录到全局缓存（所有工位趋势图自动使用）</summary>
+        /// <summary>加载历史记录到全局缓存（多选 CSV 文件，按时间合并）</summary>
         private void btnLoadHistory_Click(object sender, System.EventArgs e)
         {
             using (var dlg = new System.Windows.Forms.OpenFileDialog())
             {
-                dlg.Title = "加载历史记录";
+                dlg.Title = "选择历史记录文件（可多选）";
                 dlg.Filter = "CSV 记录 (*.csv)|*.csv";
                 dlg.InitialDirectory = RecordStore.RecordsDir;
+                dlg.Multiselect = true;
                 if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 {
                     return;
                 }
-                var data = RecordStore.Load(dlg.FileName);
+                var data = RecordStore.LoadMultiple(dlg.FileNames);
                 if (data.Count == 0)
                 {
                     System.Windows.Forms.MessageBox.Show("文件无有效数据");

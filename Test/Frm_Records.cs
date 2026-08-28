@@ -378,19 +378,20 @@ namespace Test
             UpdateYTicks();
         }
 
-        /// <summary>加载历史记录文件（records/events_日期.csv），进入历史查看模式</summary>
+        /// <summary>加载历史记录（多选 CSV 文件，按时间合并，支持按小时拆分的文件）</summary>
         private void LoadHistory()
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Title = "加载历史记录";
+                dlg.Title = "选择历史记录文件（可多选）";
                 dlg.Filter = "CSV 记录 (*.csv)|*.csv";
                 dlg.InitialDirectory = RecordStore.RecordsDir;
+                dlg.Multiselect = true;
                 if (dlg.ShowDialog() != DialogResult.OK)
                 {
                     return;
                 }
-                var fileEvents = RecordStore.Load(dlg.FileName).FindAll(ev => ev.Station == _station);
+                var fileEvents = RecordStore.LoadMultiple(dlg.FileNames).FindAll(ev => ev.Station == _station);
                 if (fileEvents.Count == 0)
                 {
                     MessageBox.Show("文件中无该工位的有效数据");
