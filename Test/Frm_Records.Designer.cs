@@ -78,7 +78,7 @@ namespace Test
             this.panelBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.panelBottom.Location = new System.Drawing.Point(0, 425);
             this.panelBottom.Name = "panelBottom";
-            this.panelBottom.Size = new System.Drawing.Size(800, 60);
+            this.panelBottom.Size = new System.Drawing.Size(800, 70);
             this.panelBottom.TabIndex = 1;
             this.btnPrev.Location = new System.Drawing.Point(12, 8);
             this.btnPrev.Name = "btnPrev";
@@ -122,9 +122,10 @@ namespace Test
             this.lblCursorInfo.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.lblCursorInfo.Location = new System.Drawing.Point(12, 36);
             this.lblCursorInfo.Name = "lblCursorInfo";
-            this.lblCursorInfo.Size = new System.Drawing.Size(776, 20);
+            this.lblCursorInfo.Size = new System.Drawing.Size(776, 24);
             this.lblCursorInfo.TabIndex = 5;
             this.lblCursorInfo.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.lblCursorInfo.Anchor = System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
             this.lblPageSec.AutoSize = true;
             this.lblPageSec.Location = new System.Drawing.Point(440, 13);
             this.lblPageSec.Name = "lblPageSec";
@@ -160,7 +161,7 @@ namespace Test
             this.cmbRefresh.SelectedIndex = 0;   // 默认 60fps（全局）
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            base.ClientSize = new System.Drawing.Size(800, 485);
+            base.ClientSize = new System.Drawing.Size(800, 495);
             base.Controls.Add(this.chart1);
             base.Controls.Add(this.panelBottom);
             base.Name = "Frm_Records";

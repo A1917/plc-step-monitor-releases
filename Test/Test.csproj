@@ -77,6 +77,7 @@
     <Compile Include="EventStore.cs" />
     <Compile Include="Simulator.cs" />
     <Compile Include="RecordStore.cs" />
+    <Compile Include="MultiConfig.cs" />
     <Compile Include="PlcData.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
