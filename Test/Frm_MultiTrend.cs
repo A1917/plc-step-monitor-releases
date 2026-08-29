@@ -133,7 +133,8 @@ namespace Test
                 RebuildSeries(false);   // 保持当前视图
             };
             // 勾选/取消勾选工位 → 立即重建曲线（保持视图不跳动；ItemCheck 在状态改变前触发，延迟重建）
-            chkStations.ItemCheck += (s, e) => BeginInvoke((MethodInvoker)delegate { RebuildSeries(false); });
+            // IsHandleCreated：FillStationList 构造期间添加勾选项也会触发 ItemCheck，此时句柄未创建不能 BeginInvoke
+            chkStations.ItemCheck += (s, e) => { if (IsHandleCreated) BeginInvoke((MethodInvoker)delegate { RebuildSeries(false); }); };
             btnFit.Click += (s, e) => FitToData();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(1);
