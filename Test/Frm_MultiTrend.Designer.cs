@@ -39,6 +39,7 @@ namespace Test
             this.btnSelectAll = new Button();
             this.btnFit = new Button();
             this.chkRange = new CheckBox();
+            this.chkCursor = new CheckBox();
             this.chkLock = new CheckBox();
             this.btnPrev = new Button();
             this.btnNext = new Button();
