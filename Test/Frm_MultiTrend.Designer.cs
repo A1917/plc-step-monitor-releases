@@ -21,6 +21,7 @@ namespace Test
         private NumericUpDown nudPageSec;
         private ComboBox cmbRefresh;
         private CheckBox chkRange;
+        private CheckBox chkCursor;
         private CheckBox chkLock;
 
         protected override void Dispose(bool disposing)
@@ -81,6 +82,7 @@ namespace Test
             this.panelBottom.Controls.Add(this.btnNext);
             this.panelBottom.Controls.Add(this.btnPrev);
             this.panelBottom.Controls.Add(this.chkLock);
+            this.panelBottom.Controls.Add(this.chkCursor);
             this.panelBottom.Controls.Add(this.chkRange);
             this.panelBottom.Controls.Add(this.btnFit);
             this.panelBottom.Controls.Add(this.btnSelectAll);
@@ -99,6 +101,11 @@ namespace Test
             this.chkRange.Location = new System.Drawing.Point(162, 7);
             this.chkRange.Size = new System.Drawing.Size(60, 19);
             this.chkRange.Text = "区域";
+            this.chkCursor.AutoSize = true;
+            this.chkCursor.Checked = true;
+            this.chkCursor.Location = new System.Drawing.Point(100, 7);
+            this.chkCursor.Size = new System.Drawing.Size(60, 19);
+            this.chkCursor.Text = "游标";
 
             this.chkLock.AutoSize = true;
             this.chkLock.Location = new System.Drawing.Point(228, 7);

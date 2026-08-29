@@ -82,7 +82,7 @@ namespace Test
             area.CursorY.LineColor = Color.FromArgb(160, 255, 0, 0);
             chart1.Legends[0].Docking = Docking.Right;
 
-            // 游标/区域注释
+            // 游标/区域注释（游标默认显示，可开关）
             _cursor = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.Orange, LineWidth = 2, Visible = true };
             _curStart = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
             _curEnd = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
@@ -101,10 +101,14 @@ namespace Test
             chart1.MouseDoubleClick += (s, e) =>
             {
                 var hit = chart1.HitTest(e.X, e.Y);
-                if (hit.ChartElementType == ChartElementType.LegendItem && hit.Object is Series ser)
+                if (hit.ChartElementType == ChartElementType.LegendItem && hit.Object is LegendItem li)
                 {
-                    using (var cd = new ColorDialog { Color = ser.Color })
-                    if (cd.ShowDialog() == DialogResult.OK) { ser.Color = cd.Color; var st = GetStationFromSeries(ser); if (st >= 0) _colors[st] = cd.Color; }
+                    var ser = chart1.Series.FirstOrDefault(x => x.Name == li.Name);
+                    if (ser != null)
+                    {
+                        using (var cd = new ColorDialog { Color = ser.Color })
+                        if (cd.ShowDialog() == DialogResult.OK) { ser.Color = cd.Color; var st = GetStationFromSeries(ser); if (st >= 0) _colors[st] = cd.Color; }
+                    }
                 }
             };
             chart1.MouseClick += (s, e) =>
@@ -116,15 +120,20 @@ namespace Test
                         return;
                     _lastClickTime = DateTime.Now;
                     var hit = chart1.HitTest(e.X, e.Y);
-                    if (hit.ChartElementType == ChartElementType.LegendItem && hit.Object is Series ser)
+                    if (hit.ChartElementType == ChartElementType.LegendItem && hit.Object is LegendItem li2)
                     {
-                        _highlightName = (ser.Name == _highlightName) ? null : ser.Name;
-                        foreach (var s2 in chart1.Series) { s2.BorderWidth = (s2.Name == _highlightName) ? 4 : 1; s2.Color = s2.Name == _highlightName ? s2.Color : Color.FromArgb(120, s2.Color); }
+                        var ser = chart1.Series.FirstOrDefault(x => x.Name == li2.Name);
+                        if (ser != null)
+                        {
+                            _highlightName = (ser.Name == _highlightName) ? null : ser.Name;
+                            foreach (var s2 in chart1.Series) { s2.BorderWidth = (s2.Name == _highlightName) ? 4 : 1; s2.Color = s2.Name == _highlightName ? s2.Color : Color.FromArgb(120, s2.Color); }
+                        }
                     }
                 }
             };
 
             chkRange.CheckedChanged += (s, e) => { _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked; if (chkRange.Checked) PlaceRangeInView(); };
+            chkCursor.CheckedChanged += (s, e) => { _cursor.Visible = chkCursor.Checked; if (chkCursor.Checked && double.IsNaN(_cursor.X)) { var view = chart1.ChartAreas[0].AxisX.ScaleView; if (!double.IsNaN(view.Position)) _cursor.X = view.Position + view.Size / 2; } };
             chkLock.CheckedChanged += (s, e) => { _lastRangeStart = _curStart.X; _lastRangeEnd = _curEnd.X; };
             btnSelectAll.Click += (s, e) =>
             {
@@ -201,7 +210,7 @@ namespace Test
             {
                 if (idx >= 50) break;
                 _stations.Add(i);
-                Color c = _colors.TryGetValue(i, out var cc) ? cc : HslColor(360.0 * idx / n);
+                Color c = _colors.TryGetValue(i, out var cc) ? cc : HslColor((idx * 137.508) % 360.0);   // 黄金角：相邻工位色相差最大
                 _colors[i] = c;
                 var ser = new Series("工位 " + i) { ChartType = SeriesChartType.StepLine, BorderWidth = 2, Color = c };
                 if (_byStation.TryGetValue(i, out var list))
@@ -384,7 +393,7 @@ namespace Test
 
         private void UpdateCursorInfo()
         {
-            if (double.IsNaN(_cursor.X)) return;
+            if (double.IsNaN(_cursor.X) || !chkCursor.Checked) return;
             DateTime t = SafeFromOADate(_cursor.X);
             var parts = new List<string> { "游标 " + t.ToString("HH:mm:ss.fff") };
             foreach (int i in _stations)
@@ -521,8 +530,23 @@ namespace Test
                 all.Sort((a, b) => a.Time.CompareTo(b.Time));
                 _data = all; _useRealtime = false; _followTail = false;
                 _byStation = _data.GroupBy(e => e.Station).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Time).ToList());
-                RebuildSeries();
-                FitToData();
+                try { chart1.SuspendLayout(); chkStations.SuspendLayout(); }
+                catch { }
+                // 刷新工位列表：保留原勾选；原无勾选时自动勾选有数据的工位（最多 30 个）
+                var checkedSet = new HashSet<int>(chkStations.CheckedIndices.Cast<int>());
+                chkStations.Items.Clear();
+                int maxSt = _data.Max(e => e.Station);
+                int autoChecked = 0;
+                for (int i = 0; i <= maxSt && i < 200; i++)
+                {
+                    int cnt = _byStation.TryGetValue(i, out var list) ? list.Count : 0;
+                    bool isChecked = checkedSet.Contains(i) || (checkedSet.Count == 0 && cnt > 0 && autoChecked++ < 30);
+                    chkStations.Items.Add("工位 " + i + " (" + cnt + " 点)", isChecked);
+                }
+                try { chkStations.ResumeLayout(); chart1.ResumeLayout(); } catch { }
+                RebuildSeries(false);   // 重建曲线保持视图
+                FitToData();            // 适应窗口（右端贴数据末尾）
+                UpdatePageLabel();
             }
         }
 
@@ -558,7 +582,7 @@ namespace Test
                 var area = chart1.ChartAreas[0];
                 if (_stations.Count == 0) return;
                 var tags = new List<TagItem>();
-                if (!double.IsNaN(_cursor.X))
+                if (!double.IsNaN(_cursor.X) && chkCursor.Checked)
                 {
                     foreach (int st in _stations)
                     {
