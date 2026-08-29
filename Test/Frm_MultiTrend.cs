@@ -54,11 +54,16 @@ namespace Test
                 DesktopBounds = new Rectangle(cfgWin.Value.Location, cfgWin.Value.Size);
             }
 
-            // 数据源：优先全局历史，否则实时
-            if (EventStore.LoadedHistory != null && EventStore.LoadedHistory.Count > 0)
+            // 数据源：仅当全局处于历史模式且已加载历史 → 历史数据；否则实时模式
+            if (EventStore.HistoryMode && EventStore.LoadedHistory != null && EventStore.LoadedHistory.Count > 0)
             {
                 _data = EventStore.LoadedHistory;
-                _useRealtime = EventStore.HistoryMode;
+                _useRealtime = false;
+            }
+            else
+            {
+                _data = new List<StepEvent>();
+                _useRealtime = true;
             }
             _byStation = _data.GroupBy(e => e.Station).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Time).ToList());
 
@@ -122,6 +127,8 @@ namespace Test
                 for (int i = 0; i < chkStations.Items.Count; i++) chkStations.SetItemChecked(i, !all);
                 RebuildSeries();
             };
+            // 勾选/取消勾选工位 → 立即重建曲线（ItemCheck 在状态改变前触发，延迟到状态更新后重建）
+            chkStations.ItemCheck += (s, e) => BeginInvoke((MethodInvoker)RebuildSeries);
             btnFit.Click += (s, e) => FitToData();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(1);
@@ -140,7 +147,8 @@ namespace Test
 
             FillStationList(cfgStations, cfgColors);
             RebuildSeries();
-            FitData();
+            FitToData();
+            _lastPointTime = DateTime.Now;   // 实时模式从当前时刻开始增量获取（防 MinValue 导致重复添加）
             _timer = new Timer { Interval = 16 };
             _timer.Tick += (s, e) =>
             {
@@ -193,7 +201,7 @@ namespace Test
             }
             if (_data.Count > 0) _lastPointTime = _data.Max(e => e.Time);
             if (_highlightName != null) { /* 高亮恢复 */ }
-            FitData();
+            FitToData();
         }
 
         // ══════════════════════════════════════════════ 实时刷新 ══════════════════════════════════════════════
@@ -453,14 +461,14 @@ namespace Test
             bool nowHistory = EventStore.HistoryMode && EventStore.LoadedHistory != null;
             if (nowHistory == !_useRealtime) return;
             if (nowHistory) { _data = EventStore.LoadedHistory; _useRealtime = false; _followTail = false; }
-            else { _data = new List<StepEvent>(); _useRealtime = true; _followTail = true; _lastPointTime = DateTime.MinValue; }
+            else { _data = new List<StepEvent>(); _useRealtime = true; _followTail = true; _lastPointTime = DateTime.Now; }
             _byStation = _data.GroupBy(e => e.Station).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Time).ToList());
             RebuildSeries();
         }
 
         private void FitToData()
         {
-            if (_data.Count == 0) return;
+            if (_data.Count == 0) { FitWindow(); return; }
             var area = chart1.ChartAreas[0];
             area.AxisX.ScaleView.Position = _data[0].Time.ToOADate();
             area.AxisX.ScaleView.Size = PageSizeDays;
