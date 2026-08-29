@@ -33,6 +33,7 @@ namespace Test
         private double _panViewStart, _panYViewStart, _panYSizeStart;
         private int _panPlotHeight = 1;
         private string _highlightName;
+        private DateTime _lastClickTime = DateTime.MinValue;
 
         // ── 分页 ──
         private int _pageSizeSec = 60;
@@ -110,6 +111,10 @@ namespace Test
             {
                 if (e.Button == MouseButtons.Left)
                 {
+                    // 双击的第一击不切换高亮（避免与双击改色冲突）
+                    if ((DateTime.Now - _lastClickTime).TotalMilliseconds < SystemInformation.DoubleClickTime)
+                        return;
+                    _lastClickTime = DateTime.Now;
                     var hit = chart1.HitTest(e.X, e.Y);
                     if (hit.ChartElementType == ChartElementType.LegendItem && hit.Object is Series ser)
                     {
@@ -125,10 +130,10 @@ namespace Test
             {
                 bool all = chkStations.CheckedItems.Count == chkStations.Items.Count;
                 for (int i = 0; i < chkStations.Items.Count; i++) chkStations.SetItemChecked(i, !all);
-                RebuildSeries();
+                RebuildSeries(false);   // 保持当前视图
             };
-            // 勾选/取消勾选工位 → 立即重建曲线（ItemCheck 在状态改变前触发，延迟到状态更新后重建）
-            chkStations.ItemCheck += (s, e) => BeginInvoke((MethodInvoker)RebuildSeries);
+            // 勾选/取消勾选工位 → 立即重建曲线（保持视图不跳动；ItemCheck 在状态改变前触发，延迟重建）
+            chkStations.ItemCheck += (s, e) => BeginInvoke((MethodInvoker)delegate { RebuildSeries(false); });
             btnFit.Click += (s, e) => FitToData();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(1);
@@ -179,13 +184,17 @@ namespace Test
             foreach (var kv in cfgColors) _colors[kv.Key] = kv.Value;
         }
 
-        private void RebuildSeries()
+        private void RebuildSeries(bool fitView = true)
         {
             chart1.Series.Clear();
             _stations.Clear();
             var area = chart1.ChartAreas[0];
             int n = Math.Min(chkStations.CheckedItems.Count, 50);
-            if (n == 0) { area.AxisX.ScaleView.Position = 0; area.AxisX.ScaleView.Size = PageSizeDays; return; }
+            if (n == 0)
+            {
+                if (fitView) { area.AxisX.ScaleView.Position = 0; area.AxisX.ScaleView.Size = PageSizeDays; }
+                return;
+            }
             int idx = 0;
             foreach (int i in chkStations.CheckedIndices)
             {
@@ -200,8 +209,16 @@ namespace Test
                 idx++;
             }
             if (_data.Count > 0) _lastPointTime = _data.Max(e => e.Time);
-            if (_highlightName != null) { /* 高亮恢复 */ }
-            FitToData();
+            // 恢复高亮（点亮的曲线加粗，其余淡化）
+            if (_highlightName != null)
+            {
+                foreach (var s in chart1.Series)
+                {
+                    if (s.Name == _highlightName) { s.BorderWidth = 4; s.Color = s.Color; }
+                    else { s.BorderWidth = 1; s.Color = Color.FromArgb(120, s.Color); }
+                }
+            }
+            if (fitView) FitToData();
         }
 
         // ══════════════════════════════════════════════ 实时刷新 ══════════════════════════════════════════════
