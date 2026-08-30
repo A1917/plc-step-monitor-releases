@@ -26,6 +26,7 @@ namespace Test
         private Button btnCycleBig;
         private Button btnCycleStep;
         private ListView lvCycle;
+        private Label lblCycleTitle;
 
         protected override void Dispose(bool disposing)
         {
@@ -57,6 +58,7 @@ namespace Test
             this.btnCycleBig = new System.Windows.Forms.Button();
             this.btnCycleStep = new System.Windows.Forms.Button();
             this.lvCycle = new System.Windows.Forms.ListView();
+            this.lblCycleTitle = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
@@ -184,11 +186,16 @@ namespace Test
             this.panelCycle.Dock = System.Windows.Forms.DockStyle.Right;
             this.panelCycle.Width = 240;
             this.panelCycle.Visible = false;
-            this.btnCycleBig.Location = new System.Drawing.Point(8, 6);
+            this.lblCycleTitle.Dock = System.Windows.Forms.DockStyle.Top;
+            this.lblCycleTitle.Height = 28;
+            this.lblCycleTitle.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.lblCycleTitle.Font = new System.Drawing.Font("微软雅黑", 10f, System.Drawing.FontStyle.Bold);
+            this.lblCycleTitle.Text = "周期";
+            this.btnCycleBig.Location = new System.Drawing.Point(8, 34);
             this.btnCycleBig.Size = new System.Drawing.Size(100, 26);
             this.btnCycleBig.Text = "从大到小";
             this.btnCycleBig.UseVisualStyleBackColor = true;
-            this.btnCycleStep.Location = new System.Drawing.Point(116, 6);
+            this.btnCycleStep.Location = new System.Drawing.Point(116, 34);
             this.btnCycleStep.Size = new System.Drawing.Size(100, 26);
             this.btnCycleStep.Text = "按步数顺序";
             this.btnCycleStep.UseVisualStyleBackColor = true;
@@ -201,6 +208,7 @@ namespace Test
             this.panelCycle.Controls.Add(this.lvCycle);
             this.panelCycle.Controls.Add(this.btnCycleBig);
             this.panelCycle.Controls.Add(this.btnCycleStep);
+            this.panelCycle.Controls.Add(this.lblCycleTitle);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 515);

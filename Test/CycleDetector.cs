@@ -32,12 +32,15 @@ namespace Test
 
             info.StartStep = list[0].Step;
             DateTime firstTime = list[0].Time;
-
-            // 找到起始步号再次出现的位置 = 周期完成点
+            // 最小步号 = 流程起点（数据中途接入时周期边界更自然）
+            short startStep = list[0].Step;
+            foreach (var e2 in list) if (e2.Step < startStep) startStep = e2.Step;
+            info.StartStep = startStep;
+            // 以最小步号再次出现为周期完成点
             var cycleStarts = new List<DateTime>();
             for (int i = 0; i < list.Count; i++)
             {
-                if (list[i].Step == info.StartStep && i > 0)
+                if (list[i].Step == startStep && i > 0)
                     cycleStarts.Add(list[i].Time);
             }
 

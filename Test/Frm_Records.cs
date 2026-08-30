@@ -67,6 +67,7 @@ namespace Test
         };
         private List<(short step, double ms)> _cycleItems;   // 当前选中周期内各步耗时（步号, 毫秒）
         private bool _cycleSortDescending = true;            // 周期列表排序：true=从大到小 false=按步数
+        private int _selectedCycleIdx = -1;                  // 选中的周期序号（-1=未选）
         private double PageSizeMs => (double)nudPageSec.Value * 1000;
         private double PageSizeDays => PageSizeMs / 86400000.0;
 
@@ -240,6 +241,12 @@ namespace Test
             // 周期详情排序切换
             btnCycleBig.Click += (s, e) => { _cycleSortDescending = true; FillCycleList(); };
             btnCycleStep.Click += (s, e) => { _cycleSortDescending = false; FillCycleList(); };
+            // 列头点击排序：步号列 → 从小到大；耗时列 → 从大到小
+            lvCycle.ColumnClick += (s, e) =>
+            {
+                if (e.Column == 0) { _cycleSortDescending = false; FillCycleList(); }
+                else if (e.Column == 1) { _cycleSortDescending = true; FillCycleList(); }
+            };
             _timer.Start();
             FormClosing += (s, e) =>
             {
@@ -922,18 +929,19 @@ namespace Test
             return "周期未完成(" + CycleDetector.FormatMs(cycle.CurrentMs) + ")";
         }
 
-        /// <summary>周期边界索引：起始步号再次出现的索引（0 为第一个周期的起点）</summary>
+        /// <summary>周期边界索引：以最小步号（流程起点）再次出现为周期边界（数据从中途接入时观感更自然）</summary>
         private List<int> GetCycleBoundaries()
         {
             var bounds = new List<int> { 0 };
             if (_events.Count < 2) return bounds;
             short s0 = _events[0].Step;
+            foreach (var ev in _events) if (ev.Step < s0) s0 = ev.Step;   // 最小步号 = 流程起点
             for (int i = 1; i < _events.Count; i++)
                 if (_events[i].Step == s0) bounds.Add(i);
             return bounds;
         }
 
-        /// <summary>图表内周期着色（勾选周期时每周期一色；关闭恢复原色；虚拟点保持段尾色）</summary>
+        /// <summary>图表内周期着色（勾选周期时每周期一色；选中的周期亮金高亮；关闭恢复原色）</summary>
         private void ApplyCycleColors()
         {
             if (!chkCycle.Checked)
@@ -948,11 +956,13 @@ namespace Test
             {
                 int cycle = 0;
                 for (int b = 1; b < bounds.Count; b++) if (i >= bounds[b]) cycle = b;
-                _series.Points[i].Color = CyclePalette[cycle % CyclePalette.Length];
+                _series.Points[i].Color = (cycle == _selectedCycleIdx)
+                    ? Color.FromArgb(255, 215, 0)   // 选中周期：亮金高亮
+                    : CyclePalette[cycle % CyclePalette.Length];
             }
         }
 
-        /// <summary>点击曲线点 → 识别所属周期 → 右侧面板显示该周期各步耗时</summary>
+        /// <summary>点击曲线点 → 识别所属周期 → 右侧面板显示该周期各步耗时 + 周期时长</summary>
         private void ShowCycleDetail(int pointIndex)
         {
             if (pointIndex < 0 || pointIndex >= _events.Count) return;
@@ -961,11 +971,16 @@ namespace Test
             for (int b = 1; b < bounds.Count; b++) if (pointIndex >= bounds[b]) cycleIdx = b;
             int start = bounds[cycleIdx];
             int end = cycleIdx + 1 < bounds.Count ? bounds[cycleIdx + 1] : _events.Count;
+            _selectedCycleIdx = cycleIdx;
             _cycleItems = new List<(short step, double ms)>();
             for (int i = start; i < end - 1; i++)
                 _cycleItems.Add((_events[i].Step, (_events[i + 1].Time - _events[i].Time).TotalMilliseconds));
+            // 标题：周期序号 + 总时长（含最后一段到周期结束的耗时）
+            double totalMs = (end - 1 >= start) ? (_events[end - 1].Time - _events[start].Time).TotalMilliseconds : 0;
+            lblCycleTitle.Text = "周期" + (cycleIdx + 1) + "  时长 " + CycleDetector.FormatMs(totalMs);
             FillCycleList();
             panelCycle.Visible = true;
+            ApplyCycleColors();   // 选中周期高亮
         }
 
         private void FillCycleList()
