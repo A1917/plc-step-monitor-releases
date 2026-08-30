@@ -16,6 +16,7 @@ namespace Test
         private Button btnSelectAll;
         private Button btnPrev;
         private Button btnNext;
+        private Button btnLoad;
         private Label lblPage;
         private Label lblPageSec;
         private NumericUpDown nudPageSec;
@@ -43,6 +44,7 @@ namespace Test
             this.chkLock = new CheckBox();
             this.btnPrev = new Button();
             this.btnNext = new Button();
+            this.btnLoad = new Button();
             this.lblPage = new Label();
             this.lblPageSec = new Label();
             this.nudPageSec = new NumericUpDown();
@@ -77,6 +79,7 @@ namespace Test
             this.panelBottom.Height = 65;
             this.panelBottom.Controls.Add(this.lblInfo);
             this.panelBottom.Controls.Add(this.cmbRefresh);
+            this.panelBottom.Controls.Add(this.btnLoad);
             this.panelBottom.Controls.Add(this.nudPageSec);
             this.panelBottom.Controls.Add(this.lblPageSec);
             this.panelBottom.Controls.Add(this.lblPage);
@@ -122,6 +125,10 @@ namespace Test
             this.btnNext.Size = new System.Drawing.Size(40, 23);
             this.btnNext.TabIndex = 5;
             this.btnNext.Text = "▶";
+            this.btnLoad.Location = new System.Drawing.Point(280, 35);
+            this.btnLoad.Size = new System.Drawing.Size(60, 23);
+            this.btnLoad.TabIndex = 7;
+            this.btnLoad.Text = "加载";
 
             this.lblPage.AutoSize = true;
             this.lblPage.Location = new System.Drawing.Point(396, 39);

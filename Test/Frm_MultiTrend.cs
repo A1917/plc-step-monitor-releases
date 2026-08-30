@@ -147,6 +147,7 @@ namespace Test
             btnFit.Click += (s, e) => FitToData();
             btnPrev.Click += (s, e) => PageMove(-1);
             btnNext.Click += (s, e) => PageMove(1);
+            btnLoad.Click += (s, e) => LoadHistory();
             nudPageSec.ValueChanged += (s, e) =>
             {
                 _pageSizeSec = (int)nudPageSec.Value;
