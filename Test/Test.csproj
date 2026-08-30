@@ -85,6 +85,7 @@
     <Compile Include="Simulator.cs" />
     <Compile Include="RecordStore.cs" />
     <Compile Include="MultiConfig.cs" />
+    <Compile Include="CycleDetector.cs" />
     <Compile Include="UpdateChecker.cs" />
     <Compile Include="PlcData.cs" />
     <Compile Include="Program.cs" />

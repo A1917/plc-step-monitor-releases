@@ -21,6 +21,7 @@ namespace Test
         private Button btnFit;
         private Button btnLoad;
         private ComboBox cmbRefresh;
+        private CheckBox chkCycle;
 
         protected override void Dispose(bool disposing)
         {
@@ -47,6 +48,7 @@ namespace Test
             this.btnFit = new System.Windows.Forms.Button();
             this.btnLoad = new System.Windows.Forms.Button();
             this.cmbRefresh = new System.Windows.Forms.ComboBox();
+            this.chkCycle = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
@@ -63,6 +65,7 @@ namespace Test
             this.chart1.Size = new System.Drawing.Size(800, 450);
             this.chart1.TabIndex = 0;
             this.chart1.Text = "chart1";
+            this.panelBottom.Controls.Add(this.chkCycle);
             this.panelBottom.Controls.Add(this.cmbRefresh);
             this.panelBottom.Controls.Add(this.btnLoad);
             this.panelBottom.Controls.Add(this.btnFit);
@@ -162,6 +165,13 @@ namespace Test
             this.cmbRefresh.TabIndex = 10;
             this.cmbRefresh.SelectedIndex = 0;   // 默认 60fps（全局）
             this.cmbRefresh.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right;
+            this.chkCycle.AutoSize = true;
+            this.chkCycle.Location = new System.Drawing.Point(690, 42);
+            this.chkCycle.Name = "chkCycle";
+            this.chkCycle.Size = new System.Drawing.Size(60, 19);
+            this.chkCycle.TabIndex = 11;
+            this.chkCycle.Text = "周期";
+            this.chkCycle.UseVisualStyleBackColor = true;
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 515);

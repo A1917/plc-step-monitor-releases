@@ -29,6 +29,7 @@ namespace Test
         // ── 交互 ──
         private bool _followTail = true;
         private bool _isPanning;
+        private int _draggingWhich = -1;   // 1=区域start 2=区域end（区域线自定义拖动，支持 Alt 吸附）
         private Point _panStart;
         private double _panViewStart, _panYViewStart, _panYSizeStart;
         private int _panPlotHeight = 1;
@@ -82,10 +83,10 @@ namespace Test
             area.CursorY.LineColor = Color.FromArgb(160, 255, 0, 0);
             chart1.Legends[0].Docking = Docking.Right;
 
-            // 游标/区域注释（游标默认显示，可开关）
-            _cursor = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.Orange, LineWidth = 2, Visible = true };
-            _curStart = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
-            _curEnd = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
+            // 游标/区域注释（游标默认隐藏，勾选后显示并归位）
+            _cursor = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = true, AllowSelecting = false, LineColor = Color.Orange, LineWidth = 2, Visible = false };
+            _curStart = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = false, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
+            _curEnd = new VerticalLineAnnotation { AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name, AllowMoving = false, AllowSelecting = false, LineColor = Color.DeepSkyBlue, LineWidth = 2, Visible = false };
             _rangeRect = new RectangleAnnotation { AxisX = area.AxisX, AxisY = area.AxisY, AllowMoving = false, AllowResizing = false, LineWidth = 0, BackColor = Color.FromArgb(70, 25, 25, 112), Visible = false };
             chart1.Annotations.Add(_cursor);
             chart1.Annotations.Add(_curStart);
@@ -96,7 +97,7 @@ namespace Test
             chart1.MouseWheel += OnMouseWheel;
             chart1.MouseDown += OnMouseDown;
             chart1.MouseMove += OnMouseMove;
-            chart1.MouseUp += (s, e) => { _isPanning = false; _lastRangeStart = _curStart.X; _lastRangeEnd = _curEnd.X; UpdateCursorInfo(); UpdateRangeInfo(); };
+            chart1.MouseUp += (s, e) => { _isPanning = false; _draggingWhich = -1; _lastRangeStart = _curStart.X; _lastRangeEnd = _curEnd.X; UpdateCursorInfo(); UpdateRangeInfo(); };
             chart1.Paint += OnChartPaint;
             chart1.MouseDoubleClick += (s, e) =>
             {
@@ -126,14 +127,19 @@ namespace Test
                         if (ser != null)
                         {
                             _highlightName = (ser.Name == _highlightName) ? null : ser.Name;
-                            foreach (var s2 in chart1.Series) { s2.BorderWidth = (s2.Name == _highlightName) ? 4 : 1; s2.Color = s2.Name == _highlightName ? s2.Color : Color.FromArgb(120, s2.Color); }
+                            // 只加粗选中曲线，不淡化其他曲线
+                            foreach (var s2 in chart1.Series) s2.BorderWidth = (s2.Name == _highlightName) ? 4 : 2;
                         }
                     }
                 }
             };
 
             chkRange.CheckedChanged += (s, e) => { _curStart.Visible = _curEnd.Visible = _rangeRect.Visible = chkRange.Checked; if (chkRange.Checked) PlaceRangeInView(); };
-            chkCursor.CheckedChanged += (s, e) => { _cursor.Visible = chkCursor.Checked; if (chkCursor.Checked && double.IsNaN(_cursor.X)) { var view = chart1.ChartAreas[0].AxisX.ScaleView; if (!double.IsNaN(view.Position)) _cursor.X = view.Position + view.Size / 2; } };
+            chkCursor.CheckedChanged += (s, e) =>
+            {
+                _cursor.Visible = chkCursor.Checked;
+                if (chkCursor.Checked) PlaceCursorInView();   // 勾选后在当前视野中央显示
+            };
             chkLock.CheckedChanged += (s, e) => { _lastRangeStart = _curStart.X; _lastRangeEnd = _curEnd.X; };
             btnSelectAll.Click += (s, e) =>
             {
@@ -220,14 +226,11 @@ namespace Test
                 idx++;
             }
             if (_data.Count > 0) _lastPointTime = _data.Max(e => e.Time);
-            // 恢复高亮（点亮的曲线加粗，其余淡化）
+            // 恢复高亮（点亮的曲线加粗，其余保持原样不淡化）
             if (_highlightName != null)
             {
                 foreach (var s in chart1.Series)
-                {
-                    if (s.Name == _highlightName) { s.BorderWidth = 4; s.Color = s.Color; }
-                    else { s.BorderWidth = 1; s.Color = Color.FromArgb(120, s.Color); }
-                }
+                    s.BorderWidth = (s.Name == _highlightName) ? 4 : 2;
             }
             if (fitView) FitToData();
         }
@@ -320,6 +323,11 @@ namespace Test
             var hit = chart1.HitTest(e.X, e.Y);
             if (hit.ChartElementType == ChartElementType.Annotation && hit.Object is VerticalLineAnnotation va)
             {
+                if (va == _curStart || va == _curEnd)
+                {
+                    _draggingWhich = (va == _curStart) ? 1 : 2;   // 区域线自定义拖动（Alt 吸附）
+                    return;
+                }
                 double x = va.X; var view = chart1.ChartAreas[0].AxisX.ScaleView;
                 if (x < view.Position || x > view.Position + view.Size) { view.Position = x - PageSizeDays / 2; _followTail = false; ClampToNow(); ClampYAxis(); UpdatePageLabel(); }
                 return;
@@ -336,6 +344,35 @@ namespace Test
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
+            // 区域线自定义拖动（Alt 吸附到步边界；锁定宽度时另一根跟随）
+            if (_draggingWhich == 1 || _draggingWhich == 2)
+            {
+                try
+                {
+                    double x = chart1.ChartAreas[0].AxisX.PixelPositionToValue(e.X);
+                    if (double.IsNaN(x)) return;
+                    if ((Control.ModifierKeys & Keys.Alt) != 0) x = SnapX(x);
+                    if (_draggingWhich == 1)
+                    {
+                        double d = x - _curStart.X;
+                        _curStart.X = x;
+                        if (chkLock.Checked && chkRange.Checked) _curEnd.X += d;
+                    }
+                    else
+                    {
+                        double d = x - _curEnd.X;
+                        _curEnd.X = x;
+                        if (chkLock.Checked && chkRange.Checked) _curStart.X += d;
+                    }
+                    _lastRangeStart = _curStart.X;
+                    _lastRangeEnd = _curEnd.X;
+                    SyncRangeRect();
+                    UpdateRangeInfo();
+                    chart1.Invalidate();
+                }
+                catch { }
+                return;
+            }
             if (chkLock.Checked && chkRange.Checked)
             {
                 double dS = _curStart.X - _lastRangeStart, dE = _curEnd.X - _lastRangeEnd;
@@ -379,6 +416,14 @@ namespace Test
 
         private void PlaceRangeInView() { var view = chart1.ChartAreas[0].AxisX.ScaleView; double c = view.Position + view.Size / 2; _curStart.X = c - view.Size * 0.15; _curEnd.X = c + view.Size * 0.15; _lastRangeStart = _curStart.X; _lastRangeEnd = _curEnd.X; SyncRangeRect(); }
 
+        /// <summary>游标归位：放在当前视野中央（勾选「游标」时调用）</summary>
+        private void PlaceCursorInView()
+        {
+            var view = chart1.ChartAreas[0].AxisX.ScaleView;
+            if (double.IsNaN(view.Position) || double.IsNaN(view.Size)) return;
+            _cursor.X = view.Position + view.Size / 2;
+        }
+
         private void SyncRangeRect()
         {
             if (double.IsNaN(_curStart.X) || double.IsNaN(_curEnd.X)) return;
@@ -399,8 +444,7 @@ namespace Test
             var parts = new List<string> { "游标 " + t.ToString("HH:mm:ss.fff") };
             foreach (int i in _stations)
             {
-                short step = StepAt(i, t);
-                parts.Add("工位" + i + ": " + (step < 0 ? "--" : step.ToString()));
+                parts.Add("工位" + i + ": " + StepAtText(i, t));
             }
             if (chkRange.Checked) { var t1 = SafeFromOADate(_curStart.X); var t2 = SafeFromOADate(_curEnd.X); parts.Add("区域 " + t1.ToString("HH:mm:ss.fff") + " ~ " + t2.ToString("HH:mm:ss.fff") + " " + ((_curEnd.X - _curStart.X) * 86400000.0).ToString("F0") + " ms"); }
             lblInfo.Text = string.Join("  |  ", parts);
@@ -422,6 +466,41 @@ namespace Test
             int lo = 0, hi = list.Count - 1, ans = -1;
             while (lo <= hi) { int mid = (lo + hi) / 2; if (list[mid].Time <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
             return ans >= 0 ? list[ans].Step : (short)-1;
+        }
+
+        /// <summary>Alt 吸附：最近的步边界时间点（阈值 = 窗口宽度 2%）</summary>
+        private double SnapX(double x)
+        {
+            try
+            {
+                if (_data.Count == 0) return x;
+                var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                double threshold = (double.IsNaN(view.Size) || view.Size <= 0) ? 0.002 : view.Size * 0.02;
+                double best = double.MaxValue, bestX = x;
+                foreach (var ev in _data)
+                {
+                    double d = Math.Abs(ev.Time.ToOADate() - x);
+                    if (d < best) { best = d; bestX = ev.Time.ToOADate(); }
+                }
+                return best < threshold ? bestX : x;
+            }
+            catch { return x; }
+        }
+
+        /// <summary>工位在 t 时刻的步号 + 该步耗时（同步单工位游标功能）</summary>
+        private string StepAtText(int station, DateTime t)
+        {
+            if (!_byStation.TryGetValue(station, out var list) || list.Count == 0) return "--";
+            int lo = 0, hi = list.Count - 1, ans = -1;
+            while (lo <= hi) { int mid = (lo + hi) / 2; if (list[mid].Time <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+            if (ans < 0) return "--";
+            string s = list[ans].Step.ToString();
+            if (ans + 1 < list.Count)
+            {
+                double ms = (list[ans + 1].Time - list[ans].Time).TotalMilliseconds;
+                s += "(" + (ms >= 1000 ? (ms / 1000.0).ToString("F1") + "s" : ms.ToString("F0") + "ms") + ")";
+            }
+            return s;
         }
 
         private static DateTime SafeFromOADate(double v) { if (double.IsNaN(v) || v < 0 || v > 2958465.99) return DateTime.MinValue; return DateTime.FromOADate(v); }

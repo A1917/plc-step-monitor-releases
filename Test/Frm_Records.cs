@@ -216,6 +216,7 @@ namespace Test
                 // 游标信息已含区域信息；区域仅在未开游标时单独显示（防覆盖）
                 if (chkCursor.Checked) UpdateCursorInfo();
                 else if (chkRange.Checked) UpdateRangeInfo();
+                else UpdateCycleInfo();
             };
             // 刷新率切换：60fps/30fps/10fps → 16/33/100ms
             cmbRefresh.SelectedIndexChanged += (s, e) =>
@@ -883,7 +884,26 @@ namespace Test
                 DateTime t2 = SafeFromOADate(_curEnd.X);
                 info += "   |   " + RangeText(t1, t2);
             }
+            if (chkCycle.Checked) info += "   |   " + CycleText();
             lblCursorInfo.Text = info;
+        }
+
+        /// <summary>周期判定文本（勾选「周期」时显示；不影响其他功能）</summary>
+        private string CycleText()
+        {
+            var cycle = CycleDetector.Analyze(_events, _station);
+            if (cycle.HasCycle)
+                return "周期 " + cycle.CycleCount + "次 平均" + CycleDetector.FormatMs(cycle.AvgCycleMs)
+                    + " 最近" + CycleDetector.FormatMs(cycle.LastCycleMs)
+                    + " 当前" + CycleDetector.FormatMs(cycle.CurrentMs);
+            return "周期未完成(" + CycleDetector.FormatMs(cycle.CurrentMs) + ")";
+        }
+
+        /// <summary>无游标/区域时独立显示周期</summary>
+        private void UpdateCycleInfo()
+        {
+            if (!chkCycle.Checked) return;
+            lblCursorInfo.Text = CycleText();
         }
 
         /// <summary>自绘游标/区域步号标签（多标签重叠自动分层错开，Y 跟随鼠标）</summary>
@@ -1078,7 +1098,9 @@ namespace Test
             if (!chkRange.Checked) return;
             DateTime t1 = SafeFromOADate(_curStart.X);
             DateTime t2 = SafeFromOADate(_curEnd.X);
-            lblCursorInfo.Text = "区域 " + RangeText(t1, t2);
+            string text = "区域 " + RangeText(t1, t2);
+            if (chkCycle.Checked) text += "   |   " + CycleText();
+            lblCursorInfo.Text = text;
         }
 
         private void SyncRangeRect()

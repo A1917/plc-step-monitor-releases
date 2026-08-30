@@ -106,7 +106,7 @@ namespace Test
             this.chkRange.Size = new System.Drawing.Size(60, 19);
             this.chkRange.Text = "区域";
             this.chkCursor.AutoSize = true;
-            this.chkCursor.Checked = true;
+            this.chkCursor.Checked = false;
             this.chkCursor.Location = new System.Drawing.Point(100, 7);
             this.chkCursor.Size = new System.Drawing.Size(60, 19);
             this.chkCursor.Text = "游标";
