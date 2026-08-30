@@ -790,7 +790,7 @@ namespace Test
             {
                 chart1.Invalidate();
             }
-            // 区域线拖动（自定义实现：Alt 吸附到步起始/结束时间点）
+            // 区域线拖动（自定义实现：Alt 吸附到步起始/结束时间点；锁定宽度时另一根线跟随）
             if (_draggingWhich == 1 || _draggingWhich == 2)
             {
                 try
@@ -798,7 +798,18 @@ namespace Test
                     double x = chart1.ChartAreas[0].AxisX.PixelPositionToValue(e.X);
                     if (double.IsNaN(x)) return;
                     if ((Control.ModifierKeys & Keys.Alt) != 0) x = SnapX(x);
-                    if (_draggingWhich == 1) _curStart.X = x; else _curEnd.X = x;
+                    if (_draggingWhich == 1)
+                    {
+                        double d = x - _curStart.X;
+                        _curStart.X = x;
+                        if (chkLockRange.Checked && chkRange.Checked) _curEnd.X += d;   // 锁定：end 跟随保持宽度
+                    }
+                    else
+                    {
+                        double d = x - _curEnd.X;
+                        _curEnd.X = x;
+                        if (chkLockRange.Checked && chkRange.Checked) _curStart.X += d;   // 锁定：start 跟随保持宽度
+                    }
                     _lastRangeStart = _curStart.X;
                     _lastRangeEnd = _curEnd.X;
                     SyncRangeRect();
@@ -956,14 +967,14 @@ namespace Test
             return "步号 " + step;
         }
 
-        /// <summary>Alt + 拖动区域线：吸附到最近的步起始/结束时间点（阈值 = 窗口宽度 0.5%）</summary>
+        /// <summary>Alt + 拖动区域线：吸附到最近的步起始/结束时间点（阈值 = 窗口宽度 2%，步边界=上一步结束=下一步开始）</summary>
         private double SnapX(double x)
         {
             try
             {
                 if (_events.Count == 0) return x;
                 var view = chart1.ChartAreas[0].AxisX.ScaleView;
-                double threshold = (double.IsNaN(view.Size) || view.Size <= 0) ? 0.0005 : view.Size * 0.005;
+                double threshold = (double.IsNaN(view.Size) || view.Size <= 0) ? 0.002 : view.Size * 0.02;
                 double best = double.MaxValue, bestX = x;
                 for (int i = 0; i < _events.Count; i++)
                 {
