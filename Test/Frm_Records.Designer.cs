@@ -51,6 +51,8 @@ namespace Test
             this.nudPageSec = new System.Windows.Forms.NumericUpDown();
             this.btnFit = new System.Windows.Forms.Button();
             this.btnLoad = new System.Windows.Forms.Button();
+            this.cmbRefresh = new System.Windows.Forms.ComboBox();
+            this.chkCycle = new System.Windows.Forms.CheckBox();
             this.panelCycle = new System.Windows.Forms.Panel();
             this.btnCycleBig = new System.Windows.Forms.Button();
             this.btnCycleStep = new System.Windows.Forms.Button();
