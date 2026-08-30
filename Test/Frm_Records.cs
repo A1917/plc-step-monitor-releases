@@ -245,13 +245,13 @@ namespace Test
             _curStart = new VerticalLineAnnotation
             {
                 AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
-                AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
+                AllowMoving = false, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
                 LineWidth = 2, Visible = false
             };
             _curEnd = new VerticalLineAnnotation
             {
                 AxisX = area.AxisX, IsInfinitive = true, ClipToChartArea = area.Name,
-                AllowMoving = true, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
+                AllowMoving = false, AllowSelecting = false, LineColor = Color.DeepSkyBlue,
                 LineWidth = 2, Visible = false
             };
             _rangeRect = new RectangleAnnotation
@@ -790,6 +790,24 @@ namespace Test
             {
                 chart1.Invalidate();
             }
+            // 区域线拖动（自定义实现：Alt 吸附到步起始/结束时间点）
+            if (_draggingWhich == 1 || _draggingWhich == 2)
+            {
+                try
+                {
+                    double x = chart1.ChartAreas[0].AxisX.PixelPositionToValue(e.X);
+                    if (double.IsNaN(x)) return;
+                    if ((Control.ModifierKeys & Keys.Alt) != 0) x = SnapX(x);
+                    if (_draggingWhich == 1) _curStart.X = x; else _curEnd.X = x;
+                    _lastRangeStart = _curStart.X;
+                    _lastRangeEnd = _curEnd.X;
+                    SyncRangeRect();
+                    UpdateRangeInfo();
+                    chart1.Invalidate();
+                }
+                catch { }
+                return;
+            }
             if (_isPanning)
             {
                 var area = chart1.ChartAreas[0];
@@ -922,8 +940,39 @@ namespace Test
 
         private string StepText(double xOADate)
         {
-            short step = FindStepAt(SafeFromOADate(xOADate));
-            return step < 0 ? "步号 --" : "步号 " + step;
+            DateTime t = SafeFromOADate(xOADate);
+            short step = FindStepAt(t);
+            if (step < 0) return "步号 --";
+            // 该步起始事件（最后一个 <= t 的事件），耗时 = 下一步起始 - 该步起始
+            int idx = -1;
+            int lo = 0, hi = _events.Count - 1;
+            while (lo <= hi) { int mid = (lo + hi) / 2; if (_events[mid].Time <= t) { idx = mid; lo = mid + 1; } else hi = mid - 1; }
+            if (idx >= 0 && idx + 1 < _events.Count)
+            {
+                double ms = (_events[idx + 1].Time - _events[idx].Time).TotalMilliseconds;
+                if (ms >= 1000) return "步号 " + step + " (" + (ms / 1000.0).ToString("F1") + "s)";
+                return "步号 " + step + " (" + ms.ToString("F0") + "ms)";
+            }
+            return "步号 " + step;
+        }
+
+        /// <summary>Alt + 拖动区域线：吸附到最近的步起始/结束时间点（阈值 = 窗口宽度 0.5%）</summary>
+        private double SnapX(double x)
+        {
+            try
+            {
+                if (_events.Count == 0) return x;
+                var view = chart1.ChartAreas[0].AxisX.ScaleView;
+                double threshold = (double.IsNaN(view.Size) || view.Size <= 0) ? 0.0005 : view.Size * 0.005;
+                double best = double.MaxValue, bestX = x;
+                for (int i = 0; i < _events.Count; i++)
+                {
+                    double d = Math.Abs(_events[i].Time.ToOADate() - x);
+                    if (d < best) { best = d; bestX = _events[i].Time.ToOADate(); }
+                }
+                return best < threshold ? bestX : x;
+            }
+            catch { return x; }
         }
 
         /// <summary>分层绘制步号标签：每根线独立基准 Y（拖动时跟随鼠标），重叠自动向下错开，Y 限定在绘图区内</summary>
