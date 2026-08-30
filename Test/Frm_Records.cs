@@ -61,6 +61,12 @@ namespace Test
 
         private const int MaxEvents = 60000;                // 窗体事件上限（防长时间累积卡顿）
         private readonly Font _labelFont = new Font("微软雅黑", 9f);   // 自绘标签字体（缓存防频繁创建）
+        private static readonly Color[] CyclePalette = {   // 周期着色色板（循环使用）
+            Color.FromArgb(230, 57, 70), Color.FromArgb(69, 123, 157), Color.FromArgb(87, 204, 153),
+            Color.FromArgb(255, 159, 28), Color.FromArgb(155, 93, 229), Color.FromArgb(38, 70, 83)
+        };
+        private List<(short step, double ms)> _cycleItems;   // 当前选中周期内各步耗时（步号, 毫秒）
+        private bool _cycleSortDescending = true;            // 周期列表排序：true=从大到小 false=按步数
         private double PageSizeMs => (double)nudPageSec.Value * 1000;
         private double PageSizeDays => PageSizeMs / 86400000.0;
 
@@ -222,9 +228,18 @@ namespace Test
             cmbRefresh.SelectedIndexChanged += (s, e) =>
             {
                 int[] intervals = { 16, 33, 100 };
-                int idx = Math.Max(0, cmbRefresh.SelectedIndex);
-                _timer.Interval = intervals[Math.Min(idx, intervals.Length - 1)];
+                int idx = cmbRefresh.SelectedIndex;
+                _timer.Interval = intervals[Math.Min(Math.Max(idx, 0), intervals.Length - 1)];
             };
+            // 周期判定：开关 → 图表内周期着色 / 恢复原色；关闭时隐藏详情面板
+            chkCycle.CheckedChanged += (s, e) =>
+            {
+                if (!chkCycle.Checked) panelCycle.Visible = false;
+                ApplyCycleColors();
+            };
+            // 周期详情排序切换
+            btnCycleBig.Click += (s, e) => { _cycleSortDescending = true; FillCycleList(); };
+            btnCycleStep.Click += (s, e) => { _cycleSortDescending = false; FillCycleList(); };
             _timer.Start();
             FormClosing += (s, e) =>
             {
@@ -476,6 +491,8 @@ namespace Test
                 {
                     chart1.ResumeLayout();
                 }
+                // 周期判定开启时新数据着色（仅数据变化时，低频）
+                if (chkCycle.Checked) ApplyCycleColors();
                 // 跟随滚动在 ResumeLayout 后（防 SuspendLayout 期间 ExtendCurrentStep 改 Points 后
                 // ResumeLayout 重算布局导致 ScaleView 被重置——宽度/高度周期变化）
                 if (_followTail && dataActive)
@@ -723,10 +740,16 @@ namespace Test
             UpdateYTicks();   // 刻度步进/0 基准随视野更新
         }
 
-        /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标</summary>
+        /// <summary>鼠标按下：仅绘图区内启动拖拽平移；游标在视野外时滚动到游标；周期开启时点击曲线显示周期详情</summary>
         private void OnChartMouseDown(object sender, MouseEventArgs e)
         {
             var hit = chart1.HitTest(e.X, e.Y);
+            // 周期判定开启时：点击曲线数据点 → 显示该周期各步耗时
+            if (chkCycle.Checked && hit.ChartElementType == ChartElementType.DataPoint && hit.PointIndex >= 0)
+            {
+                ShowCycleDetail(hit.PointIndex);
+                return;
+            }
             if (hit.ChartElementType == ChartElementType.Annotation && hit.Object is VerticalLineAnnotation va)
             {
                 // 点击游标，若在视野外则滚动到视野内
@@ -897,6 +920,65 @@ namespace Test
                     + " 最近" + CycleDetector.FormatMs(cycle.LastCycleMs)
                     + " 当前" + CycleDetector.FormatMs(cycle.CurrentMs);
             return "周期未完成(" + CycleDetector.FormatMs(cycle.CurrentMs) + ")";
+        }
+
+        /// <summary>周期边界索引：起始步号再次出现的索引（0 为第一个周期的起点）</summary>
+        private List<int> GetCycleBoundaries()
+        {
+            var bounds = new List<int> { 0 };
+            if (_events.Count < 2) return bounds;
+            short s0 = _events[0].Step;
+            for (int i = 1; i < _events.Count; i++)
+                if (_events[i].Step == s0) bounds.Add(i);
+            return bounds;
+        }
+
+        /// <summary>图表内周期着色（勾选周期时每周期一色；关闭恢复原色；虚拟点保持段尾色）</summary>
+        private void ApplyCycleColors()
+        {
+            if (!chkCycle.Checked)
+            {
+                for (int i = 0; i < _series.Points.Count; i++) _series.Points[i].Color = Color.Empty;   // 恢复 Series 原色
+                return;
+            }
+            if (_events.Count < 2) return;
+            var bounds = GetCycleBoundaries();
+            int n = Math.Min(_series.Points.Count, _events.Count);
+            for (int i = 0; i < n; i++)
+            {
+                int cycle = 0;
+                for (int b = 1; b < bounds.Count; b++) if (i >= bounds[b]) cycle = b;
+                _series.Points[i].Color = CyclePalette[cycle % CyclePalette.Length];
+            }
+        }
+
+        /// <summary>点击曲线点 → 识别所属周期 → 右侧面板显示该周期各步耗时</summary>
+        private void ShowCycleDetail(int pointIndex)
+        {
+            if (pointIndex < 0 || pointIndex >= _events.Count) return;
+            var bounds = GetCycleBoundaries();
+            int cycleIdx = 0;
+            for (int b = 1; b < bounds.Count; b++) if (pointIndex >= bounds[b]) cycleIdx = b;
+            int start = bounds[cycleIdx];
+            int end = cycleIdx + 1 < bounds.Count ? bounds[cycleIdx + 1] : _events.Count;
+            _cycleItems = new List<(short step, double ms)>();
+            for (int i = start; i < end - 1; i++)
+                _cycleItems.Add((_events[i].Step, (_events[i + 1].Time - _events[i].Time).TotalMilliseconds));
+            FillCycleList();
+            panelCycle.Visible = true;
+        }
+
+        private void FillCycleList()
+        {
+            if (_cycleItems == null) return;
+            lvCycle.BeginUpdate();
+            lvCycle.Items.Clear();
+            var list = new List<(short step, double ms)>(_cycleItems);
+            if (_cycleSortDescending) list.Sort((a, b) => b.ms.CompareTo(a.ms));   // 从大到小
+            else list.Sort((a, b) => a.step.CompareTo(b.step));                    // 按步数顺序
+            foreach (var it in list)
+                lvCycle.Items.Add(new ListViewItem(new[] { it.step.ToString(), CycleDetector.FormatMs(it.ms) }));
+            lvCycle.EndUpdate();
         }
 
         /// <summary>无游标/区域时独立显示周期</summary>

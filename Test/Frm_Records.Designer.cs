@@ -22,6 +22,10 @@ namespace Test
         private Button btnLoad;
         private ComboBox cmbRefresh;
         private CheckBox chkCycle;
+        private Panel panelCycle;
+        private Button btnCycleBig;
+        private Button btnCycleStep;
+        private ListView lvCycle;
 
         protected override void Dispose(bool disposing)
         {
@@ -47,8 +51,10 @@ namespace Test
             this.nudPageSec = new System.Windows.Forms.NumericUpDown();
             this.btnFit = new System.Windows.Forms.Button();
             this.btnLoad = new System.Windows.Forms.Button();
-            this.cmbRefresh = new System.Windows.Forms.ComboBox();
-            this.chkCycle = new System.Windows.Forms.CheckBox();
+            this.panelCycle = new System.Windows.Forms.Panel();
+            this.btnCycleBig = new System.Windows.Forms.Button();
+            this.btnCycleStep = new System.Windows.Forms.Button();
+            this.lvCycle = new System.Windows.Forms.ListView();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             this.panelBottom.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.nudPageSec)).BeginInit();
@@ -172,9 +178,31 @@ namespace Test
             this.chkCycle.TabIndex = 11;
             this.chkCycle.Text = "周期";
             this.chkCycle.UseVisualStyleBackColor = true;
+            // ── 周期详情面板（点击周期线条后显示） ──
+            this.panelCycle.Dock = System.Windows.Forms.DockStyle.Right;
+            this.panelCycle.Width = 240;
+            this.panelCycle.Visible = false;
+            this.btnCycleBig.Location = new System.Drawing.Point(8, 6);
+            this.btnCycleBig.Size = new System.Drawing.Size(100, 26);
+            this.btnCycleBig.Text = "从大到小";
+            this.btnCycleBig.UseVisualStyleBackColor = true;
+            this.btnCycleStep.Location = new System.Drawing.Point(116, 6);
+            this.btnCycleStep.Size = new System.Drawing.Size(100, 26);
+            this.btnCycleStep.Text = "按步数顺序";
+            this.btnCycleStep.UseVisualStyleBackColor = true;
+            this.lvCycle.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lvCycle.FullRowSelect = true;
+            this.lvCycle.GridLines = true;
+            this.lvCycle.View = System.Windows.Forms.View.Details;
+            this.lvCycle.Columns.Add("步号", 80);
+            this.lvCycle.Columns.Add("耗时", 140);
+            this.panelCycle.Controls.Add(this.lvCycle);
+            this.panelCycle.Controls.Add(this.btnCycleBig);
+            this.panelCycle.Controls.Add(this.btnCycleStep);
             base.AutoScaleDimensions = new System.Drawing.SizeF(8f, 15f);
             base.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             base.ClientSize = new System.Drawing.Size(800, 515);
+            base.Controls.Add(this.panelCycle);
             base.Controls.Add(this.chart1);
             base.Controls.Add(this.panelBottom);
             base.Name = "Frm_Records";
