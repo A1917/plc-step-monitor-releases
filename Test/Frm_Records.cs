@@ -929,16 +929,10 @@ namespace Test
             return "周期未完成(" + CycleDetector.FormatMs(cycle.CurrentMs) + ")";
         }
 
-        /// <summary>周期边界索引：以最小步号（流程起点）再次出现为周期边界（数据从中途接入时观感更自然）</summary>
+        /// <summary>周期边界索引（复用 CycleDetector：最小步号起点 + 噪声过滤）</summary>
         private List<int> GetCycleBoundaries()
         {
-            var bounds = new List<int> { 0 };
-            if (_events.Count < 2) return bounds;
-            short s0 = _events[0].Step;
-            foreach (var ev in _events) if (ev.Step < s0) s0 = ev.Step;   // 最小步号 = 流程起点
-            for (int i = 1; i < _events.Count; i++)
-                if (_events[i].Step == s0) bounds.Add(i);
-            return bounds;
+            return CycleDetector.GetBoundaries(_events);
         }
 
         /// <summary>图表内周期着色（勾选周期时每周期一色；选中的周期亮金高亮；关闭恢复原色）</summary>

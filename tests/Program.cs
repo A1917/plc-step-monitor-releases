@@ -57,14 +57,25 @@ namespace Test
             var ev2 = MakeEvents(2, 0, 20, 40, 60);
             var c2 = CycleDetector.Analyze(ev2, 2);
             Assert(!c2.HasCycle, "单调序列无完整周期");
-            // 最小步号起点：从中间接入 20→40→0→20→40→0（最小步号 0 为周期起点）
-            var ev3 = MakeEvents(3, 20, 40, 0, 20, 40, 0);
+            // 中途接入：20→40→60→0→20→40→60→0（首段 3 事件完整 → 2 周期）
+            var ev3 = MakeEvents(3, 20, 40, 60, 0, 20, 40, 60, 0);
             var c3 = CycleDetector.Analyze(ev3, 3);
             AssertEq(c3.StartStep, (short)0, "中途接入→起点为最小步号 0");
-            AssertEq(c3.CycleCount, 2, "中途接入周期数=2");
+            AssertEq(c3.CycleCount, 2, "中途接入周期数=2 (got " + c3.CycleCount + ")");
             // 空数据
             var c4 = CycleDetector.Analyze(new List<StepEvent>(), 1);
             Assert(!c4.HasCycle && c4.CycleCount == 0, "空数据安全");
+            // 抖动不误切：0→20→0→40→0→20→0（回落抖动被吸收，不切成 3 个短周期）
+            var ev5 = MakeEvents(5, 0, 20, 0, 40, 0, 20, 0);
+            var c5 = CycleDetector.Analyze(ev5, 5);
+            Assert(c5.CycleCount <= 1, "抖动不切成多个短周期 (got " + c5.CycleCount + ")");
+            // 首值重复不误切：0,0,20,40,0,20,40,0（连续重复步号去重后 = 2 周期）
+            var ev6 = MakeEvents(6, 1000, 0, 0, 20, 40, 0, 20, 40, 0);
+            var c6 = CycleDetector.Analyze(ev6, 6);
+            AssertEq(c6.CycleCount, 2, "首值重复去重后周期数=2 (got " + c6.CycleCount + ")");
+            // 边界过滤后 GetBoundaries 与 Analyze 一致
+            var b6 = CycleDetector.GetBoundaries(ev6);
+            AssertEq(b6.Count - 1, c6.CycleCount, "GetBoundaries 与 Analyze 一致");
         }
 
         // ═══════════════ EventStore ═══════════════
