@@ -1,7 +1,7 @@
 # 欧姆龙流程步监控程序 — 工作总结备忘
 
 > 用途：跨会话延续上下文。新会话里让 Hermes 读本文件即可接着推进。
-> 更新时间：2026-08-22
+> 更新时间：2026-08-29
 
 ## ⚠️ 2026-08-22 大事记：源码加密损坏 → 反编译恢复 → 优化重建
 - 工作电脑发来的两个 zip（PLCStepMonitor.zip、stepRecord.zip）里 **6 个核心 .cs 文件被加密软件污染**：
@@ -69,5 +69,6 @@
 
 ## 五、版本管理（本次重建）
 - 新仓库：`/root/plc-step-monitor-v2/`（git 已 init，干净历史），远程分支 `v2-optimized`（A1917/plc-step-monitor）
-- 交付流程：编译 → push v2-optimized → GitHub Release 上传运行包（浏览器下载解压即用，工作电脑零安装）
+- 交付流程：编译 → **编写/更新相关测试并验证通过** → push v2-optimized → GitHub Release 上传运行包（浏览器下载解压即用，工作电脑零安装）
+- **测试规则（2026-08-29 用户明确要求）**：每次改动后必须为该次改动编写或更新相关测试，验证通过后才推送；纯文档改动除外。后续 CycleDetector/EventStore/StepRecorder 等逻辑类改动需配单元测试（建议新建独立测试工程）
 - Release 历史：v0.1-optimized（恢复+优化基线）、v0.2-config（IP+工位数配置）
