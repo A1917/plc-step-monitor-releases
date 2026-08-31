@@ -60,8 +60,13 @@ namespace Test
             // 中途接入：20→40→60→0→20→40→60→0（首段 3 事件完整 → 2 周期）
             var ev3 = MakeEvents(3, 20, 40, 60, 0, 20, 40, 60, 0);
             var c3 = CycleDetector.Analyze(ev3, 3);
-            AssertEq(c3.StartStep, (short)0, "中途接入→起点为最小步号 0");
+            AssertEq(c3.StartStep, (short)0, "中途接入→起点为最小步号 0 (got " + c3.StartStep + ")");
             AssertEq(c3.CycleCount, 2, "中途接入周期数=2 (got " + c3.CycleCount + ")");
+            // 采集丢步不合并：0 步偶发缺失 0,20,40,20,40,0,20,40,0（0 缺失时 20/40 稳定出现 → 自动切换起点）
+            var ev7 = MakeEvents(7, 0, 20, 40, 20, 40, 0, 20, 40, 0);
+            var c7 = CycleDetector.Analyze(ev7, 7);
+            Assert(c7.StartStep == 20 || c7.StartStep == 40, "丢步时起点为稳定步号 (got " + c7.StartStep + ")");
+            Assert(c7.CycleCount >= 2, "丢步不合并周期 (got " + c7.CycleCount + ")");
             // 空数据
             var c4 = CycleDetector.Analyze(new List<StepEvent>(), 1);
             Assert(!c4.HasCycle && c4.CycleCount == 0, "空数据安全");
