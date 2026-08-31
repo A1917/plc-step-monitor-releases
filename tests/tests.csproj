@@ -14,4 +14,10 @@
     <Compile Include="..\Test\EventStore.cs" Link="EventStore.cs" />
     <Compile Include="..\Test\RecordStore.cs" Link="RecordStore.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- 真实数据回归测试用 -->
+    <Content Include="data\*.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

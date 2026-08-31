@@ -44,10 +44,10 @@ namespace Test
             {
                 int prev = valid.Count > 0 ? valid[valid.Count - 1] : 0;
                 int span = c - prev;
-                if (span < 3) continue;                              // 周期至少 3 个事件
+                if (span < 3) continue;                              // 周期至少 3 个事件（防 1-2 事件抖动）
                 var set = new HashSet<short>();
                 for (int i = prev; i < c; i++) set.Add(clean[i].Step);
-                if (set.Count < 3) continue;                         // 周期内至少 3 个不同步号
+                if (set.Count < 2) continue;                         // 周期内至少 2 个不同步号（防 0↔0 连续）
                 valid.Add(c);
             }
             foreach (int ci in valid)
@@ -59,25 +59,34 @@ namespace Test
         }
 
         /// <summary>
-        /// 选周期起点步号：出现 ≥3 次、间隔一致（方差最小）的步号。
-        /// 采集丢步（如 0 步偶发缺失）时，稳定出现的步号自动成为起点，周期不合并。
+        /// 选周期起点步号：出现 ≥3 次的候选中选间隔方差最小；无 ≥3 次候选时退而选次数最多的。
+        /// 防止只出现 1-2 次的异常步号（如 0 偶发出现）因间隔方差为 0 而误选。
         /// </summary>
         public static short SelectStartStep(List<StepEvent> clean)
         {
             if (clean == null || clean.Count < 2) return -1;
+            // 内部先去连续重复（与 GetBoundaries 一致，防首值重复干扰间隔）
+            var seq = new List<StepEvent>();
+            foreach (var e in clean)
+                if (seq.Count == 0 || seq[seq.Count - 1].Step != e.Step) seq.Add(e);
+            if (seq.Count < 2) return -1;
             var byStep = new Dictionary<short, List<int>>();
-            for (int i = 0; i < clean.Count; i++)
+            for (int i = 0; i < seq.Count; i++)
             {
-                if (!byStep.TryGetValue(clean[i].Step, out var idxs)) { idxs = new List<int>(); byStep[clean[i].Step] = idxs; }
+                if (!byStep.TryGetValue(seq[i].Step, out var idxs)) { idxs = new List<int>(); byStep[seq[i].Step] = idxs; }
                 idxs.Add(i);
             }
+            // 两轮筛选：优先出现 ≥3 次的候选；全部 <3 次时用出现次数最多的
+            var candidates = byStep.Where(kv => kv.Value.Count >= 3).ToList();
+            if (candidates.Count == 0)
+                candidates = byStep.OrderByDescending(kv => kv.Value.Count).ToList();
             short best = -1;
             double bestVariance = double.MaxValue;
             int bestCount = 0;
-            foreach (var kv in byStep)
+            foreach (var kv in candidates)
             {
                 var idxs = kv.Value;
-                if (idxs.Count < 2) continue;   // 至少出现 2 次（≥1 个完整周期）
+                if (idxs.Count < 2) continue;
                 var gaps = new List<int>();
                 bool ok = true;
                 for (int i = 1; i < idxs.Count; i++)

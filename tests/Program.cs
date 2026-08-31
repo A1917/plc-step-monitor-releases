@@ -16,7 +16,7 @@ namespace Test
     {
         private static int _passed, _failed;
 
-        private static void Assert(bool cond, string name)
+        internal static void Assert(bool cond, string name)
         {
             if (cond) { _passed++; }
             else { _failed++; Console.WriteLine("  FAIL: " + name); }
@@ -152,6 +152,7 @@ namespace Test
         private static int Main()
         {
             Console.WriteLine("== 单元测试 ==");
+            RealDataProbe.Run();
             TestCycleDetector();
             TestEventStore();
             TestRecordStore();
