@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>Test.Tests</AssemblyName>
+    <RootNamespace>Test</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 链接主项目逻辑类源码（WinForms 无关部分），随主项目同步演进 -->
+    <Compile Include="..\Test\CycleDetector.cs" Link="CycleDetector.cs" />
+    <Compile Include="..\Test\EventStore.cs" Link="EventStore.cs" />
+    <Compile Include="..\Test\RecordStore.cs" Link="RecordStore.cs" />
+  </ItemGroup>
+</Project>

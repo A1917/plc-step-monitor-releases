@@ -145,10 +145,18 @@ PLC/模拟器 → PlcData.ThdStep（100ms 批量读）
 ## 5. 发布流程
 
 1. 编译（MSBuild Rebuild 0 错误 0 警告）
-2. 单文件打包：`Test.exe` → zip（`PLCStepMonitor/Test.exe`）
-3. 推源码：`main` → 私有仓库 `v2-optimized` 分支 + 公开仓库 `main`
-4. 打 tag（vX.Y.Z）+ 双边 GitHub Release + 上传 zip
-5. **AssemblyInfo 版本号随发版递增**（自动更新对比 tag，不升会永远提示更新）
+2. **运行单元测试**：`dotnet run --project tests`（Windows dotnet，从 WSL 调 `/mnt/c/Program Files/dotnet/dotnet.exe`），退出码 0 = 通过
+3. 单文件打包：`Test.exe` → zip（`PLCStepMonitor/Test.exe`）
+4. 推源码：`main` → 私有仓库 `v2-optimized` 分支 + 公开仓库 `main`
+5. 打 tag（vX.Y.Z）+ 双边 GitHub Release + 上传 zip
+6. **AssemblyInfo 版本号随发版递增**（自动更新对比 tag，不升会永远提示更新）
+
+### 5.1 测试（tests/）
+
+- **工程**：`tests/tests.csproj`（.NET 9 console，自写断言零依赖），链接主项目逻辑类源码
+- **覆盖**：CycleDetector（周期检测/最小步号起点/空数据）、EventStore（首值/增量/环形上限）、RecordStore（CSV 解析容错/多文件合并排序）
+- **规则**：每次改动后必须为该改动编写/更新测试并验证通过后才推送；纯文档改动除外
+- **注意**：EventStore 依赖 PlcData.StepCount，测试工程用 `tests/PlcDataStub.cs` 桩替代（无 HslCommunication 依赖）
 
 ## 6. 未实现/规划中
 - 断点续传（更新下载中断恢复）
